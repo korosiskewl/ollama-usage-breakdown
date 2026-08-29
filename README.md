@@ -3,6 +3,8 @@
 [![CodeQL](https://github.com/srnoob2570/ollama-usage-breakdown/actions/workflows/codeql.yml/badge.svg)](https://github.com/srnoob2570/ollama-usage-breakdown/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/srnoob2570/ollama-usage-breakdown/badge)](https://scorecard.dev/viewer/?uri=github.com/srnoob2570/ollama-usage-breakdown)
 
+**Credits:** This userscript was originally created by **srnoob0237** on Discord, and has been modified by **manytricks**.
+
 A Tampermonkey userscript that makes the usage meters on [ollama.com/settings](https://ollama.com/settings) actually readable, with a per-model breakdown of your Ollama Cloud usage.
 
 ![Session and weekly usage meters with a per-model breakdown of requests and percentages](./docs/session.png) ![Weekly usage meter with per-model percentages](./docs/weekly.png)
