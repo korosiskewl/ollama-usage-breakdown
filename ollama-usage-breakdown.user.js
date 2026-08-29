@@ -1,58 +1,75 @@
 // ==UserScript==
-// @name         Ollama Usage Breakdown
+// @name         Ollama Usage Breakdown + Dark Mode
 // @namespace    https://github.com/srnoob2570
-// @version      1.3.7
-// @description  Adds an Ollama-style per-model session breakdown and inline per-model usage percentages.
-// @author       srnoob2570
-// @license      MIT
-// @match        https://ollama.com/settings
+// @version      1.4.1
+// @version      1.4.2
+// @description  Adds an Ollama-style per-model session breakdown, inline per-model usage percentages, and always-on dark mode for ollama.com.
+// @author       srnoob2570 (dark mode by minitrix)
+// @match        https://ollama.com/*
 // @homepageURL  https://github.com/srnoob2570/ollama-usage-breakdown
 // @supportURL   https://github.com/srnoob2570/ollama-usage-breakdown/issues
-// @updateURL    https://raw.githubusercontent.com/srnoob2570/ollama-usage-breakdown/main/ollama-usage-breakdown.user.js
-// @downloadURL  https://raw.githubusercontent.com/srnoob2570/ollama-usage-breakdown/main/ollama-usage-breakdown.user.js
-// @run-at       document-idle
+// @run-at       document-start
 // @noframes
 // @grant        none
 // ==/UserScript==
 
-// Enhances the usage meters on ollama.com/settings: adds a per-model session
-// list under the session meter, injects per-model percentages into the native
-// weekly list, and appends absolute reset times. All data is parsed from the
-// DOM (aria-labels, segment widths, data attributes); no API calls. The page
-// re-renders itself in place, so refresh() re-derives everything from scratch
-// on every pass, and cleanup only touches nodes this script marked.
+// NOTE (fork): @updateURL and @downloadURL were removed on purpose. Keeping
+// them would let Tampermonkey auto-update this file back to the upstream
+// script and silently erase the always-on dark mode added here.
 
 (() => {
     "use strict";
 
-    const PANEL = "data-oue-panel";
+    /**
+     * Ollama Usage Breakdown — Tampermonkey userscript (fork).
+     *
+     * Enhances the usage meters on ollama.com/settings:
+     * - adds a per-model "Models used this session" list under the session meter,
+     * - injects per-model percentages into the session list and Ollama's native
+     *   weekly list, rescaled against the overall "X% used" figure,
+     * - shows the absolute reset date/time next to each relative reset.
+     *
+     * Fork addition — Dark mode:
+     * - themes every ollama.com page dark by overriding the site's
+     *   own compiled Tailwind utility classes under an `odm-on` class on
+     *   <html> (applied at document-start, so there is no light flash), and
+     * - inverts solid-dark monochrome images (the ollama logo, brand marks)
+     *   via canvas luminance/saturation analysis; colored images are untouched.
+     *
+     * All data is parsed from the page DOM (aria-labels, segment widths, data
+     * attributes); the script never calls an Ollama API. The page re-renders
+     * itself in place, so refresh() re-derives all state from scratch on every
+     * run and its cleanup only removes or reverts nodes this script marked.
+     */
+
+    // Selectors into Ollama's markup, plus the marker attributes
+    // (data-ollama-usage-enhancer, data-oue-*) that tag every node this script
+    // creates or modifies, so refreshes can find their own work and undo it.
+    const TRACK = "[data-usage-track]";
+    const SEGMENT = "[data-usage-segment]";
+    const PANEL = "data-ollama-usage-enhancer";
+    const WEEKLY_LIST_ID = "weekly-usage-models";
+    const WEEKLY_LIST_LABEL = "Models used this week";
+    const SESSION_LIST_LABEL = "Models used this session";
     const PCT_MARK = "data-oue-pct";
     const COUNT_MARK = "data-oue-num";
     const STYLE_ID = "ollama-usage-enhancer-styles";
-    const OWN_MARKS = `[${PANEL}],[${PCT_MARK}]`;
-    const PCT_CLASS = "oue-pct flex-none tabular-nums text-neutral-400";
 
-    const OLLAMA = {
-        track: "[data-usage-track]",
-        segment: "[data-usage-segment]",
-        meter: "[data-usage-meter]",
-        localTime: ".local-time[data-time]",
-        weeklyListId: "weekly-usage-models",
-        weeklyHeading: "Models used this week",
-        sessionLabel: /session/i,
-        weeklyLabel: /weekly/i,
-        requestsAttr: "data-requests",
-        modelAttr: "data-model",
-        timeAttr: "data-time",
-        countLabel: /(\d[\d.,]*)\s+requests?/i,
-        countSuffix: /:\s*\d[\d.,]*\s+requests?\s*$/i,
-    };
+    // --- dark mode (fork) --------------------------------------------------
+    // The dark theme lives under html.odm-on; the class, the style
+    // element and the theme-color meta are site-wide by design and
+    // intentionally survive navigation.
+    const DARK_CLASS = "odm-on";
+    const DARK_STYLE_ID = "ollama-dark-mode-styles";
 
+    // Session panel per track; a WeakMap lets removed tracks be collected.
     const panels = new WeakMap();
-    const numberFormat = new Intl.NumberFormat(
-        document.documentElement.lang || undefined,
+    const formatNumber = new Intl.NumberFormat(
+        document.documentElement?.lang || undefined,
     );
-    const resetFormat = new Intl.DateTimeFormat("en-US", {
+    // formatNumber follows the page language; reset timestamps are pinned to
+    // en-US so the appended absolute time does not vary with the page locale.
+    const resetTimeFormatter = new Intl.DateTimeFormat("en-US", {
         year: "numeric",
         month: "long",
         day: "numeric",
@@ -61,21 +78,361 @@
     });
 
     let refreshQueued = false;
-    let injected = false;
 
+    /**
+     * Dark theme CSS, applied only under html.odm-on, so the default (off)
+     * state leaves the site 100% untouched. Selectors mirror ollama's
+     * compiled Tailwind build (bg/text/border/divide/ring/from utilities and
+     * their hover:/focus:/aria-selected:/peer-checked:/has-[]/sm:/
+     * placeholder: variants). Layout, spacing, fonts and rounding are never
+     * touched.
+     */
+    const DARK_CSS = String.raw`
+/* ---------- base ---------- */
+.odm-on { background-color: #0a0a0a; color-scheme: dark; }
+.odm-on body { color: #f5f5f5; }
+.odm-on ::selection { background: #264f78; color: #f5f5f5; }
+.odm-on input, .odm-on textarea, .odm-on select { color: #f5f5f5; }
+
+/* ---------- backgrounds ---------- */
+.odm-on .bg-white { background-color: #141414; }
+.odm-on .bg-white\/95 { background-color: rgba(20, 20, 20, 0.95); }
+.odm-on .bg-neutral-50 { background-color: #1a1a1a; }
+.odm-on .bg-neutral-100 { background-color: #1f1f1f; }
+.odm-on .bg-neutral-200 { background-color: #404040; }
+.odm-on .bg-neutral-300 { background-color: #525252; }
+.odm-on .bg-neutral-400 { background-color: #737373; }
+.odm-on .bg-neutral-800 { background-color: #212121; }
+.odm-on .bg-neutral-900 { background-color: #262626; }
+.odm-on .bg-black\/5 { background-color: rgba(255, 255, 255, 0.07); }
+.odm-on .bg-neutral-50\/50 { background-color: rgba(255, 255, 255, 0.06); }
+.odm-on .sm\:bg-white { background-color: #141414; }
+/* note: .bg-black, .bg-neutral-950, .text-white intentionally unchanged
+   (already-dark buttons, overlays and their white text stay as designed) */
+
+.odm-on .hover\:bg-black:hover { background-color: #3f3f3f; }
+.odm-on .hover\:bg-black\/10:hover { background-color: rgba(255, 255, 255, 0.12); }
+.odm-on .hover\:bg-neutral-50:hover { background-color: #1a1a1a; }
+.odm-on .hover\:bg-neutral-100:hover { background-color: #1f1f1f; }
+.odm-on .hover\:bg-neutral-300:hover { background-color: #525252; }
+.odm-on .hover\:bg-neutral-800:hover { background-color: #333333; }
+.odm-on .hover\:bg-neutral-900:hover { background-color: #333333; }
+.odm-on .hover\:bg-white:hover { background-color: #141414; }
+.odm-on .focus\:bg-black:focus { background-color: rgba(255, 255, 255, 0.12); }
+.odm-on .focus\:bg-neutral-50:focus { background-color: #1a1a1a; }
+.odm-on .aria-selected\:bg-neutral-800[aria-selected="true"] { background-color: #333333; }
+.odm-on .aria-selected\:hover\:bg-neutral-800:hover[aria-selected="true"] { background-color: #3f3f3f; }
+.odm-on .disabled\:bg-neutral-500:disabled { background-color: #525252; }
+.odm-on .disabled\:bg-neutral-900:disabled { background-color: #262626; }
+.odm-on .peer:checked ~ .peer-checked\:bg-neutral-100 { background-color: #404040; }
+
+/* marquee/scroller fade masks (from-white -> from page background) */
+.odm-on .from-white {
+  --tw-gradient-from: #0a0a0a;
+  --tw-gradient-to: rgba(10, 10, 10, 0);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+/* ---------- text ---------- */
+.odm-on .text-black { color: #f5f5f5; }
+.odm-on .text-black\/65 { color: rgba(245, 245, 245, 0.65); }
+.odm-on .text-neutral-900 { color: #f5f5f5; }
+.odm-on .text-neutral-800 { color: #e5e5e5; }
+.odm-on .text-neutral-700 { color: #d4d4d4; }
+.odm-on .text-neutral-600 { color: #a3a3a3; }
+.odm-on .text-neutral-500 { color: #a3a3a3; }
+.odm-on .hover\:text-black:hover { color: #f5f5f5; }
+.odm-on .hover\:text-neutral-600:hover { color: #f5f5f5; }
+.odm-on .hover\:text-neutral-700:hover { color: #f5f5f5; }
+.odm-on .hover\:text-neutral-800:hover { color: #f5f5f5; }
+.odm-on .hover\:text-neutral-900:hover { color: #ffffff; }
+.odm-on .focus-visible\:text-neutral-700:focus-visible { color: #d4d4d4; }
+.odm-on .group:hover .group-hover\:text-neutral-900 { color: #ffffff; }
+.odm-on .group:focus .group-focus\:text-neutral-900 { color: #ffffff; }
+.odm-on .sm\:text-black { color: #f5f5f5; }
+.odm-on .sm\:text-neutral-800 { color: #e5e5e5; }
+/* note: .text-neutral-100, .text-neutral-300, .text-neutral-400 intentionally
+   unchanged - they appear both on light surfaces (secondary labels, where
+   #a3a3a3/#d4d4d4 remain readable on dark) and inside already-dark cards /
+   buttons (where flipping them would create dark-on-dark). Preserves the
+   original design intent everywhere. */
+
+.odm-on .placeholder\:text-neutral-400::placeholder,
+.odm-on .placeholder\:text-neutral-400::-moz-placeholder { color: #8f8f8f; }
+.odm-on .placeholder\:text-neutral-500::placeholder,
+.odm-on .placeholder\:text-neutral-500::-moz-placeholder { color: #8f8f8f; }
+.odm-on .placeholder-neutral-400::placeholder,
+.odm-on .placeholder-neutral-400::-moz-placeholder { color: #8f8f8f; }
+.odm-on .focus\:placeholder-neutral-500:focus::placeholder,
+.odm-on .focus\:placeholder-neutral-500:focus::-moz-placeholder { color: #8f8f8f; }
+
+/* ---------- borders ---------- */
+.odm-on .border-neutral-50 { border-color: #262626; }
+.odm-on .border-neutral-100 { border-color: #262626; }
+.odm-on .border-neutral-200 { border-color: #2e2e2e; }
+.odm-on .border-neutral-300 { border-color: #404040; }
+.odm-on .border-neutral-600 { border-color: #525252; }
+.odm-on .border-neutral-800 { border-color: #212121; }
+.odm-on .hover\:border-black:hover { border-color: #a3a3a3; }
+.odm-on .hover\:border-neutral-300:hover { border-color: #525252; }
+.odm-on .focus\:border-black:focus { border-color: #d4d4d4; }
+.odm-on .focus\:border-neutral-50:focus { border-color: #525252; }
+.odm-on .aria-selected\:border-neutral-800[aria-selected="true"] { border-color: #333333; }
+.odm-on .sm\:border-neutral-200 { border-color: #2e2e2e; }
+.odm-on .has-\[\:checked\]\:border-neutral-300:has(:checked),
+.odm-on .has-\[\+\[error\]\:empty\]\:border-neutral-300:has(+[error]:empty) { border-color: #404040; }
+
+/* ---------- dividers ---------- */
+.odm-on .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) { border-color: #262626; }
+.odm-on .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { border-color: #2e2e2e; }
+.odm-on .divide-neutral-300 > :not([hidden]) ~ :not([hidden]) { border-color: #404040; }
+
+/* ---------- rings ---------- */
+.odm-on .ring-neutral-200 { --tw-ring-color: #2e2e2e; }
+.odm-on .focus\:ring-black:focus { --tw-ring-color: rgba(255, 255, 255, 0.45); }
+.odm-on .focus\:ring-neutral-300:focus { --tw-ring-color: #525252; }
+.odm-on .focus\:ring-neutral-400:focus { --tw-ring-color: #737373; }
+
+/* ---------- typography (.prose: markdown on model/blog/docs pages) ---------- */
+.odm-on .prose {
+  --tw-prose-body: #d4d4d4;
+  --tw-prose-headings: #f5f5f5;
+  --tw-prose-lead: #a3a3a3;
+  --tw-prose-links: #f5f5f5;
+  --tw-prose-bold: #f5f5f5;
+  --tw-prose-counters: #a3a3a3;
+  --tw-prose-bullets: #525252;
+  --tw-prose-hr: #262626;
+  --tw-prose-quotes: #f5f5f5;
+  --tw-prose-quote-borders: #262626;
+  --tw-prose-captions: #a3a3a3;
+  --tw-prose-kbd: #f5f5f5;
+  --tw-prose-kbd-shadows: 255 255 255;
+  --tw-prose-code: #e5e5e5;
+  --tw-prose-pre-code: #e5e7eb;
+  --tw-prose-pre-bg: #1f2937;
+  --tw-prose-th-borders: #404040;
+  --tw-prose-td-borders: #262626;
+}
+.odm-on .prose blockquote { color: #a3a3a3; }
+.odm-on .prose li { color: #d4d4d4; }
+.odm-on .prose li::marker { color: #a3a3a3; }
+/* inline code chips */
+.odm-on .prose :not(pre) > code { background-color: #1f1f1f; color: #e5e5e5; }
+/* code blocks (site forces light pre via prose-pre:bg-neutral-100/50) */
+.odm-on .prose pre { background-color: #161616; color: #e5e5e5; }
+
+/* ---------- prism code tokens (light theme -> dark-friendly) ---------- */
+.odm-on .token.comment, .odm-on .token.cdata, .odm-on .token.doctype, .odm-on .token.prolog { color: #737373; }
+.odm-on .token.punctuation { color: #a3a3a3; }
+.odm-on .token.boolean, .odm-on .token.constant, .odm-on .token.deleted,
+.odm-on .token.number, .odm-on .token.property, .odm-on .token.symbol, .odm-on .token.tag,
+.odm-on .token.attr-name, .odm-on .token.builtin, .odm-on .token.char,
+.odm-on .token.inserted, .odm-on .token.selector, .odm-on .token.string { color: #4ec9b0; }
+.odm-on .token.atrule, .odm-on .token.attr-value, .odm-on .token.keyword { color: #569cd6; }
+.odm-on .token.class-name, .odm-on .token.function { color: #e5e5e5; }
+.odm-on .token.important, .odm-on .token.regex, .odm-on .token.variable { color: #f87171; }
+.odm-on .language-css .token.string, .odm-on .style .token.string,
+.odm-on .token.entity, .odm-on .token.operator, .odm-on .token.url { color: #d4d4d4; background: transparent; }
+.odm-on code[class*="language-"]::selection,
+.odm-on code[class*="language-"] ::selection,
+.odm-on pre[class*="language-"]::selection,
+.odm-on pre[class*="language-"] ::selection,
+.odm-on code[class*="language-"]::-moz-selection,
+.odm-on pre[class*="language-"]::-moz-selection { background: #264f78; }
+
+/* ---------- gray (blog/docs prose) + arbitrary light-blue chip bg ---------- */
+/* ---------- gray prose + model-card tag pills ---------- */
+.odm-on .text-gray-900 { color: #f5f5f5; }
+.odm-on .text-gray-600 { color: #a3a3a3; }
+.odm-on .text-gray-500 { color: #a3a3a3; }
+.odm-on .border-gray-200 { border-color: #2e2e2e; }
+.odm-on .bg-\[\#ddf4ff\] { background-color: #12293d; }
+.odm-on .text-blue-600 { color: #7ab8ff; }
+.odm-on .border-blue-500 { border-color: #2563eb; }
+.odm-on .border-blue-500 { border-color: #2563eb; }
+.odm-on .bg-indigo-50 { background-color: #232341; }
+.odm-on .text-indigo-600 { color: #c5cdff; }
+.odm-on .bg-cyan-50 { background-color: #07313c; }
+.odm-on .text-cyan-500 { color: #7ceefc; }
+
+/* ---------- solid-dark logo images (detected at runtime) ---------- */
+.odm-on img.odm-inv { filter: invert(1); }
+
+`;
+
+    /**
+     * Inject the dark-theme stylesheet once; idempotent.
+     *
+     * Kept separate from addStyles() because this stylesheet must exist on
+     * EVERY ollama.com page (dark mode is site-wide), while the .oue-* column
+     * styles are only needed inside /settings.
+     */
+    function ensureDarkStyles() {
+        if (document.getElementById(DARK_STYLE_ID)) return;
+        const style = document.createElement("style");
+        style.id = DARK_STYLE_ID;
+        style.textContent = DARK_CSS;
+        (document.head || document.documentElement).append(style);
+    }
+
+    /**
+     * Sync the browser UI theme-color meta with dark mode.
+     *
+     * Only touches a meta tag this script created (tracked via a dataset
+     * flag), so a site-set theme-color is never overwritten or removed.
+     */
+    function syncThemeColor() {
+        if (!document.head) {
+            // document-start edge: <head> may not exist yet; retry briefly.
+            setTimeout(syncThemeColor, 4);
+            return;
+        }
+        let meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+            meta = document.createElement("meta");
+            meta.name = "theme-color";
+            meta.dataset.ollamaUsageEnhancerDark = "1";
+            document.head.append(meta);
+        }
+        meta.setAttribute("content", "#0a0a0a");
+    }
+
+    /**
+     * Invert solid-dark monochrome images (logos) in dark mode.
+     *
+     * The theme is always on, and classifies every image just once
+     * (data-odm-scan guard), so repeated refresh() calls stay cheap.
+     */
+    function scanDarkImages() {
+        const images = document.images;
+        for (const img of images) {
+            if (img.dataset.odmScan) continue;
+            img.dataset.odmScan = "1";
+            if (img.complete && img.naturalWidth > 0) {
+                classifyDarkImage(img);
+            } else {
+                img.addEventListener(
+                    "load",
+                    () => classifyDarkImage(img),
+                    { once: true },
+                );
+                img.addEventListener(
+                    "error",
+                    () => { img.dataset.odmScan = "2"; },
+                    { once: true },
+                );
+            }
+        }
+    }
+
+    /**
+     * Add .odm-inv (invert filter) to solid-dark monochrome images.
+     *
+     * Downsamples to <=160px on the long side, then measures mean luminance
+     * and mean saturation. Dark + desaturated => a logo that would vanish on
+     * a dark background, so it gets inverted. Colorful images (model
+     * avatars, charts) and cross-origin (tainted-canvas) images are skipped.
+     *
+     * @param {HTMLImageElement} img - Image to classify.
+     */
+    function classifyDarkImage(img) {
+        try {
+            const w = img.naturalWidth;
+            const h = img.naturalHeight;
+            if (!w || !h) return;
+
+            const scale = Math.min(1, 160 / Math.max(w, h));
+            const cw = Math.max(1, Math.round(w * scale));
+            const ch = Math.max(1, Math.round(h * scale));
+            const canvas = document.createElement("canvas");
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            if (!ctx) return;
+            ctx.drawImage(img, 0, 0, cw, ch);
+            // getImageData throws on tainted (cross-origin) canvases; the
+            // catch below leaves those images untouched.
+            const data = ctx.getImageData(0, 0, cw, ch).data;
+            let opaque = 0;
+            let lumSum = 0;
+            let satSum = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 30) continue;
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                opaque++;
+                lumSum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                satSum += max === 0 ? 0 : (max - min) / max;
+            }
+            if (!opaque) return;
+            if (lumSum / opaque < 0.35 && satSum / opaque < 0.25) {
+                img.classList.add("odm-inv");
+            }
+        } catch (error) {
+            // cross-origin / broken image: leave untouched
+        }
+    }
+
+    /**
+     * Apply the dark theme before first paint.
+     *
+     * At document-start <html> may not exist yet in the earliest injection
+     * contexts; retry on a short timer until it does, then inject the
+     * stylesheet and apply the permanent dark state.
+     */
+    function bootDark() {
+        if (!document.documentElement) {
+            setTimeout(bootDark, 4);
+            return;
+        }
+        ensureDarkStyles();
+        document.documentElement.classList.add(DARK_CLASS);
+        syncThemeColor();
+        if (document.readyState === "loading") {
+            document.addEventListener(
+                "DOMContentLoaded",
+                () => {
+                    scanDarkImages();
+                },
+                { once: true },
+            );
+        } else {
+            scanDarkImages();
+        }
+    }
+
+    /**
+     * Inject the fixed-width numeric column styles once per page.
+     *
+     * Right-aligned, fixed-width columns keep the request counts and
+     * percentages lined up in both breakdowns. Ollama ships a compiled
+     * Tailwind build, so arbitrary utilities like `min-w-[5.5rem]` are not
+     * guaranteed to exist; a small style block is the safe route.
+     */
     function addStyles() {
         if (document.getElementById(STYLE_ID)) return;
+
         const style = document.createElement("style");
         style.id = STYLE_ID;
         style.textContent = `
       .oue-num { min-width: 5.5rem; text-align: right; }
       .oue-pct { min-width: 3.5rem; text-align: right; }
-      #${OLLAMA.weeklyListId} { margin-top: 1.25rem; }
     `;
         (document.head || document.documentElement).append(style);
-        injected = true;
     }
 
+    /**
+     * Create an element with an optional class and text content.
+     *
+     * @param {string} tag - Tag name.
+     * @param {string} [className] - Class attribute value.
+     * @param {string} [text] - Text content, set only when provided.
+     * @returns {HTMLElement} The created element.
+     */
     function element(tag, className, text) {
         const node = document.createElement(tag);
         if (className) node.className = className;
@@ -83,127 +440,274 @@
         return node;
     }
 
-    function percentFrom(text) {
-        const match = text?.match(/(-?\d+(?:[.,]\d+)?)\s*%/);
+    /**
+     * Extract the numeric percentage from a value like "84.2%".
+     *
+     * Accepts both decimal separators ("84.2%" and "84,2%").
+     *
+     * @param {string|undefined} value - Text to parse (e.g. a segment's CSS width).
+     * @returns {number|null} The percentage, or null when absent or unparseable.
+     */
+    function percent(value) {
+        const match = value?.match(/(-?\d+(?:[.,]\d+)?)\s*%/);
         return match ? Number(match[1].replace(",", ".")) : null;
     }
 
-    const overallUsage = (track) => percentFrom(track.getAttribute("aria-label"));
+    /**
+     * Read a segment's request count.
+     *
+     * Prefers the `data-requests` attribute and falls back to the aria-label
+     * (e.g. "42 requests"). Non-digit characters such as thousands separators
+     * are stripped, so "1,234" parses as 1234.
+     *
+     * @param {HTMLElement} segment - Usage bar segment.
+     * @returns {number|null} Request count, or null when neither source
+     *   yields a safe integer.
+     */
+    function requests(segment) {
+        const raw =
+            segment.dataset.requests ||
+            segment
+                .getAttribute("aria-label")
+                ?.match(/(\d[\d.,]*)\s+requests?/i)?.[1];
+        if (!raw) return null;
 
-    function readSegments(track, share, details = false) {
-        return [...track.querySelectorAll(OLLAMA.segment)].map(
-            (segment, index) => {
-                const name =
-                    segment.getAttribute(OLLAMA.modelAttr)?.trim() ||
-                    segment
-                        .getAttribute("aria-label")
-                        ?.replace(OLLAMA.countSuffix, "")
-                        .trim() ||
-                    `Model ${index + 1}`;
+        const value = Number(raw.replace(/\D/g, ""));
+        return Number.isSafeInteger(value) ? value : null;
+    }
 
-                const width = segment.style.width.trim();
-                const widthPercent = percentFrom(width);
-                const item = {
-                    name,
-                    width,
-                    absolute:
-                        widthPercent !== null && share !== null
-                            ? (widthPercent * share) / 100
-                            : null,
-                };
-                if (details) {
-                    const attr = segment
-                        .getAttribute(OLLAMA.requestsAttr)
-                        ?.trim();
-                    const raw = /^\d[\d.,\s]*$/.test(attr || "")
-                        ? attr
-                        : segment
-                              .getAttribute("aria-label")
-                              ?.match(OLLAMA.countLabel)?.[1];
-                    const parsed = raw ? Number(raw.replace(/\D/g, "")) : null;
-                    const color = getComputedStyle(segment).backgroundColor;
-                    item.requests =
-                        parsed !== null && Number.isSafeInteger(parsed)
-                            ? parsed
-                            : null;
-                    item.color =
-                        !color ||
-                        color === "transparent" ||
-                        color === "rgba(0, 0, 0, 0)"
-                            ? "currentColor"
-                            : color;
-                }
-                return item;
-            },
+    /**
+     * Resolve a segment's model name.
+     *
+     * Order: the `data-model` attribute, then the aria-label with its
+     * trailing "N requests" suffix removed, then "Model N" as a positional
+     * fallback.
+     *
+     * @param {HTMLElement} segment - Usage bar segment.
+     * @param {number} index - Segment position, used only for the fallback.
+     * @returns {string} Display name for the model.
+     */
+    function modelName(segment, index) {
+        return (
+            segment.dataset.model?.trim() ||
+            segment
+                .getAttribute("aria-label")
+                ?.replace(/:\s*\d[\d.,]*\s+requests?\s*$/i, "")
+                .trim() ||
+            `Model ${index + 1}`
         );
     }
 
-    function usageLabel(item) {
-        if (item.absolute === null) return item.width || "—";
-        if (item.absolute === 0) return "0%";
-        const rounded = item.absolute.toFixed(2);
+    /**
+     * Background color of a segment, used for the legend dot.
+     *
+     * Falls back to `currentColor` when the computed background is unset or
+     * fully transparent, so the dot stays visible instead of disappearing.
+     *
+     * @param {Element} segment - Usage bar segment.
+     * @returns {string} A CSS color value.
+     */
+    function segmentColor(segment) {
+        const color = getComputedStyle(segment).backgroundColor;
+        return !color || color === "transparent" || color === "rgba(0, 0, 0, 0)"
+            ? "currentColor"
+            : color;
+    }
+
+    /**
+     * Overall usage Ollama reports in the track's aria-label.
+     *
+     * "Session usage 10.7% used" -> 10.7. This is the share of the total
+     * limit already consumed; readSegments() uses it to rescale the
+     * per-model segment shares.
+     *
+     * @param {Element} track - Usage meter track element.
+     * @returns {number|null} Overall usage percentage, or null when the
+     *   label contains none.
+     */
+    function overallUsagePercent(track) {
+        const match = (track.getAttribute("aria-label") || "").match(
+            /(\d+(?:[.,]\d+)?)\s*%/,
+        );
+        return match ? Number(match[1].replace(",", ".")) : null;
+    }
+
+    /**
+     * Read every segment of a usage track into a plain record.
+     *
+     * Ollama exposes each model's usage share only as the segment width in
+     * its own HTML, and those widths are shares of the used portion (they
+     * sum to 100%). Rescaling them by the overall "X% used" measures every
+     * model against the total limit, so the percentages sum to X instead.
+     *
+     * @param {Element} track - Usage meter track element.
+     * @param {number|null} share - Overall usage percentage from
+     *   overallUsagePercent(); null when unavailable.
+     * @returns {Array<{name: string, requests: number|null, width: string,
+     *   percent: number|null, absolute: number|null, color: string}>}
+     *   One record per segment, in DOM order. `percent` is the raw share of
+     *   the used portion; `absolute` is `percent` rescaled against `share`
+     *   (null when either value is unavailable).
+     */
+    function readSegments(track, share) {
+        return [
+            .../** @type {NodeListOf<HTMLElement>} */ (
+                track.querySelectorAll(SEGMENT)
+            ),
+        ].map((segment, index) => {
+            const width = segment.style.width.trim();
+            const sharePercent = percent(width);
+            return {
+                name: modelName(segment, index),
+                requests: requests(segment),
+                width,
+                percent: sharePercent,
+                absolute:
+                    sharePercent !== null && share !== null
+                        ? (sharePercent * share) / 100
+                        : null,
+                color: segmentColor(segment),
+            };
+        });
+    }
+
+    /**
+     * Format a request count for display, e.g. "1,234 requests".
+     *
+     * @param {number|null} value - Request count, or null when unknown.
+     * @returns {string} Localized count with unit, or "—" when unknown.
+     */
+    function formatRequests(value) {
+        if (value === null) return "—";
+        return `${formatNumber.format(value)} ${value === 1 ? "request" : "requests"}`;
+    }
+
+    /**
+     * Format a rescaled percentage with two decimal places.
+     *
+     * Nonzero values that round down to "0.00" render as "<0.01%" so tiny
+     * shares remain visible.
+     *
+     * @param {number|null} value - Percentage of the total limit, or null.
+     * @returns {string|null} Formatted percentage, or null when unknown.
+     */
+    function formatAbsolute(value) {
+        if (value === null) return null;
+        if (value === 0) return "0%";
+        const rounded = value.toFixed(2);
         return rounded === "0.00" ? "<0.01%" : `${rounded}%`;
     }
 
-    function findTrack(pattern, tracks) {
+    /**
+     * Percentage label for a segment record.
+     *
+     * Prefers the rescaled percentage; falls back to Ollama's raw width when
+     * the overall usage figure is unavailable.
+     *
+     * @param {{absolute: number|null, width: string}} item - Segment record.
+     * @returns {string} Display label, or "—" when nothing is available.
+     */
+    function usageLabel(item) {
+        return formatAbsolute(item.absolute) || item.width || "—";
+    }
+
+    /**
+     * Find the usage track whose aria-label matches a meter kind.
+     *
+     * @param {string} kind - Meter kind ("session" or "weekly"), matched
+     *   case-insensitively as a regular expression against the aria-label.
+     * @param {Element[]} tracks - Candidate tracks.
+     * @returns {Element|null} The first matching track, or null.
+     */
+    function trackForKind(kind, tracks) {
         return (
             tracks.find((track) =>
-                pattern.test(track.getAttribute("aria-label") || ""),
+                new RegExp(kind, "i").test(
+                    track.getAttribute("aria-label") || "",
+                ),
             ) || null
         );
     }
 
+    /**
+     * Append the absolute reset date/time next to each relative reset text.
+     *
+     * Ollama renders `.local-time[data-time]` elements with relative text
+     * ("Resets in 2 hours") that it rewrites in place; the absolute part is
+     * appended in parentheses and re-derived whenever the relative text
+     * changes, tracked via data attributes on the element itself.
+     */
     function enhanceResetTimes() {
-        document.querySelectorAll(OLLAMA.localTime).forEach((time) => {
-            const currentText = time.textContent.trim();
-            if (!currentText || currentText === time.dataset.oueResetDisplay) {
-                return;
-            }
-            const resetAt = new Date(time.getAttribute(OLLAMA.timeAttr));
+        /** @type {NodeListOf<HTMLElement>} */ (
+            document.querySelectorAll(".local-time[data-time]")
+        ).forEach((time) => {
+            const resetAt = new Date(/** @type {string} */ (time.dataset.time));
             if (Number.isNaN(resetAt.getTime())) return;
 
-            const display = `${currentText} (${resetFormat.format(resetAt)})`;
-            time.textContent = display;
-            time.dataset.oueRelativeText = currentText;
-            time.dataset.oueResetDisplay = display;
+            const currentText = time.textContent.trim();
+            const previousDisplay =
+                time.dataset.ollamaUsageEnhancerResetDisplay;
+            const relativeTime =
+                currentText !== previousDisplay
+                    ? currentText
+                    : time.dataset.ollamaUsageEnhancerRelativeResetText ||
+                      currentText;
+            const display = `${relativeTime} (${resetTimeFormatter.format(resetAt)})`;
+
+            if (currentText !== display) time.textContent = display;
+            time.dataset.ollamaUsageEnhancerRelativeResetText = relativeTime;
+            time.dataset.ollamaUsageEnhancerResetDisplay = display;
+
+            // Remove the hover-only data added by version 1.2.1, without
+            // changing the tooltip that Ollama itself provides.
+            if (time.title.startsWith("Exact reset time:")) {
+                time.removeAttribute("title");
+            }
+            if (
+                time.getAttribute("aria-label")?.includes(". Exact reset time:")
+            ) {
+                time.removeAttribute("aria-label");
+            }
         });
     }
 
+    /**
+     * Render or update the "Models used this session" panel.
+     *
+     * Uses the exact same markup Ollama uses for its native weekly list
+     * ("Models used this week"), plus a percentage column. The panel is
+     * cached per track, placed right after the meter's reset time when one
+     * exists (after the track itself otherwise), and rebuilt from scratch on
+     * every call.
+     *
+     * @param {Element} track - Session usage track.
+     * @param {ReturnType<typeof readSegments>} segments - Segment records.
+     * @returns {Element} The panel element, tagged with the PANEL marker.
+     */
     function renderSessionList(track, segments) {
         let panel = panels.get(track);
         if (!panel) {
             panel = document.createElement("div");
+            panel.id = "session-usage-models";
             panel.setAttribute(PANEL, "");
-            panel.className = "mt-5 space-y-1.5";
+            panel.className = "mt-3 space-y-1.5";
             panels.set(track, panel);
         }
 
-        const meter = track.closest(OLLAMA.meter);
-        const resetTime = meter?.nextElementSibling?.matches(OLLAMA.localTime)
+        const meter = track.closest("[data-usage-meter]");
+        const resetTime = meter?.nextElementSibling?.matches(
+            ".local-time[data-time]",
+        )
             ? meter.nextElementSibling
             : null;
-        const anchor = resetTime || track;
-        if (anchor.nextElementSibling !== panel) {
-            anchor.after(panel);
+        const insertionPoint = resetTime || track;
+        if (insertionPoint.nextElementSibling !== panel) {
+            insertionPoint.after(panel);
         }
-
-        const sig = segments
-            .map((s) => `${s.name}|${s.requests}|${s.width}|${s.color}`)
-            .join("\n");
-        if (panel.dataset.oueSig === sig) return panel;
-        panel.dataset.oueSig = sig;
-
         panel.replaceChildren();
-        panel.append(
-            element("div", "text-xs text-neutral-500", "Models used this session"),
-        );
+        panel.append(element("div", "text-xs text-neutral-500", SESSION_LIST_LABEL));
+
         for (const item of segments) {
-            const count =
-                item.requests === null
-                    ? "—"
-                    : `${numberFormat.format(item.requests)} ${
-                        item.requests === 1 ? "request" : "requests"
-                    }`;
             const row = element("div", "flex min-w-0 items-center gap-2 text-xs");
             const dot = element("span", "h-2 w-2 flex-none rounded-sm");
             const name = element(
@@ -211,6 +715,7 @@
                 "min-w-0 flex-1 truncate text-neutral-700",
                 item.name,
             );
+
             dot.style.background = item.color;
             dot.setAttribute("aria-hidden", "true");
             name.title = item.name;
@@ -220,110 +725,138 @@
                 element(
                     "span",
                     "oue-num flex-none tabular-nums text-neutral-400",
-                    count,
+                    formatRequests(item.requests),
                 ),
-                element("span", PCT_CLASS, usageLabel(item)),
+                element(
+                    "span",
+                    "oue-pct flex-none tabular-nums text-neutral-400",
+                    usageLabel(item),
+                ),
             );
             panel.append(row);
         }
+
         return panel;
     }
 
-    function enhanceWeeklyList(segments) {
-        const list =
-            document.getElementById(OLLAMA.weeklyListId) ||
-            [...document.querySelectorAll("div.text-xs")].find(
-                (node) => node.textContent.trim() === OLLAMA.weeklyHeading,
-            )?.parentElement ||
-            null;
+    /**
+     * Locate Ollama's native weekly usage list.
+     *
+     * Prefers the well-known element id and falls back to the parent of the
+     * div whose text equals the weekly list heading.
+     *
+     * @returns {Element|null} The weekly list container, or null when absent.
+     */
+    function weeklyUsageList() {
+        const byId = document.getElementById(WEEKLY_LIST_ID);
+        if (byId) return byId;
+
+        const heading = [...document.querySelectorAll("div.text-xs")].find(
+            (node) => node.textContent.trim() === WEEKLY_LIST_LABEL,
+        );
+        return heading?.parentElement ?? null;
+    }
+
+    /**
+     * Inject per-model percentages into Ollama's native weekly list.
+     *
+     * The native list shows request counts but no per-model percentage, so
+     * the share Ollama encodes in the meter segments is added as an extra
+     * column. Ollama's own request counts are aligned into the same
+     * fixed-width column the session list uses, tagged with COUNT_MARK so
+     * cleanup can revert the styling. Rows whose model has no matching
+     * segment lose the injected column again.
+     *
+     * @param {Element} track - Weekly usage track (not read directly; the
+     *   list is located via weeklyUsageList()).
+     * @param {ReturnType<typeof readSegments>} segments - Segment records.
+     */
+    function enhanceWeeklyList(track, segments) {
+        const list = weeklyUsageList();
         if (!list) return;
 
-        const labelsByName = new Map(
-            segments
-                .filter((item) => item.width)
-                .map((item) => [item.name, usageLabel(item)]),
-        );
+        const labelsByName = new Map();
+        for (const item of segments) {
+            if (item.width) labelsByName.set(item.name, usageLabel(item));
+        }
 
-        for (const row of list.querySelectorAll(":scope > div")) {
-            const nameSpan = row.querySelector("span[title]");
+        list.querySelectorAll(":scope > div").forEach((row) => {
+            const nameSpan = /** @type {HTMLElement} */ (
+                row.querySelector("span[title]")
+            );
             const name =
                 nameSpan?.getAttribute("title")?.trim() ||
                 nameSpan?.textContent?.trim();
-            let pct = row.querySelector(`[${PCT_MARK}]`);
-            let countSpan = null;
-            for (const span of row.querySelectorAll("span.tabular-nums")) {
-                if (!span.hasAttribute(PCT_MARK)) {
-                    countSpan = span;
-                    break;
-                }
-            }
+            if (!name) return;
 
-            if (!name || !labelsByName.has(name)) {
+            const label = labelsByName.get(name);
+            let pct = row.querySelector(`[${PCT_MARK}]`);
+            const countSpan = [...row.querySelectorAll("span.tabular-nums")].find(
+                (span) => !span.hasAttribute(PCT_MARK),
+            );
+
+            if (!label) {
                 pct?.remove();
                 if (countSpan?.hasAttribute(COUNT_MARK)) {
                     countSpan.classList.remove("oue-num");
                     countSpan.removeAttribute(COUNT_MARK);
                 }
-                continue;
+                return;
             }
 
             if (countSpan && !countSpan.hasAttribute(COUNT_MARK)) {
                 countSpan.classList.add("oue-num");
                 countSpan.setAttribute(COUNT_MARK, "");
             }
+
             if (!pct) {
-                pct = element("span", PCT_CLASS);
+                pct = element(
+                    "span",
+                    "oue-pct flex-none tabular-nums text-neutral-400",
+                );
                 pct.setAttribute(PCT_MARK, "");
                 (countSpan || nameSpan).after(pct);
             }
-            if (pct.textContent !== labelsByName.get(name)) {
-                pct.textContent = labelsByName.get(name);
-            }
-        }
+
+            if (pct.textContent !== label) pct.textContent = label;
+        });
     }
 
-    function cleanup() {
-        if (!injected) return;
-        injected = false;
-        document
-            .querySelectorAll(OWN_MARKS)
-            .forEach((node) => node.remove());
-        document.querySelectorAll(`[${COUNT_MARK}]`).forEach((span) => {
-            span.classList.remove("oue-num");
-            span.removeAttribute(COUNT_MARK);
-        });
-        document.querySelectorAll("[data-oue-relative-text]").forEach((time) => {
-            time.textContent = time.dataset.oueRelativeText;
-            delete time.dataset.oueRelativeText;
-            delete time.dataset.oueResetDisplay;
-        });
-        document.getElementById(STYLE_ID)?.remove();
-    }
-
+    /**
+     * Reconcile the page with the desired enhancements; safe to run often.
+     *
+     * Outside the bare /settings path, removes every node this script added
+     * and reverts the marked spans (cleanup on navigation). Inside, refreshes
+     * reset times, rescans newly loaded images for dark treatment,
+     * rebuilds the session panel from the session track, injects percentages
+     * into the weekly list, and drops stale panels. When no aria-label
+     * matches, the first track is treated as the session meter and the next
+     * one as weekly.
+     */
     function refresh() {
         refreshQueued = false;
 
-        if (!/^\/settings$/.test(location.pathname)) {
-            cleanup();
+        if (!/^\/settings\/?$/.test(location.pathname)) {
+            document
+                .querySelectorAll(`[${PANEL}],[${PCT_MARK}]`)
+                .forEach((node) => node.remove());
+            document.querySelectorAll(`[${COUNT_MARK}]`).forEach((span) => {
+                span.classList.remove("oue-num");
+                span.removeAttribute(COUNT_MARK);
+            });
             return;
         }
 
         addStyles();
+        scanDarkImages();
         enhanceResetTimes();
 
-        const tracks = [...document.querySelectorAll(OLLAMA.track)];
-        const label = (track) => track.getAttribute("aria-label") || "";
+        const tracks = [...document.querySelectorAll(TRACK)];
         const sessionTrack =
-            findTrack(OLLAMA.sessionLabel, tracks) ||
-            tracks.find((track) => !OLLAMA.weeklyLabel.test(label(track))) ||
-            null;
+            trackForKind("session", tracks) || tracks[0] || null;
         const weeklyTrack =
-            findTrack(OLLAMA.weeklyLabel, tracks) ||
-            tracks.find(
-                (track) =>
-                    track !== sessionTrack &&
-                    !OLLAMA.sessionLabel.test(label(track)),
-            ) ||
+            trackForKind("weekly", tracks) ||
+            tracks.find((track) => track !== sessionTrack) ||
             null;
 
         const activePanels = new Set();
@@ -331,16 +864,17 @@
         if (sessionTrack) {
             const segments = readSegments(
                 sessionTrack,
-                overallUsage(sessionTrack),
-                true,
+                overallUsagePercent(sessionTrack),
             );
             if (segments.length) {
                 activePanels.add(renderSessionList(sessionTrack, segments));
             }
         }
+
         if (weeklyTrack) {
             enhanceWeeklyList(
-                readSegments(weeklyTrack, overallUsage(weeklyTrack)),
+                weeklyTrack,
+                readSegments(weeklyTrack, overallUsagePercent(weeklyTrack)),
             );
         }
 
@@ -349,58 +883,92 @@
         });
     }
 
+    /**
+     * Queue a single refresh on the next animation frame.
+     *
+     * Coalesces bursts of mutations into one pass; refresh() clears the flag
+     * so later changes queue again.
+     */
     function scheduleRefresh() {
         if (refreshQueued) return;
         refreshQueued = true;
-        if (document.hidden) setTimeout(refresh, 500);
-        else requestAnimationFrame(refresh);
+        requestAnimationFrame(refresh);
     }
 
+    /**
+     * Whether a mutated node belongs to this script's own additions.
+     *
+     * Lets the observer ignore self-inflicted mutations and avoid feeding
+     * back into another refresh.
+     *
+     * @param {Node} node - Added or removed node.
+     * @returns {boolean} True when the node is, or is inside, a panel,
+     *   percentage span.
+     */
     function isOwnChange(node) {
         return (
             node instanceof Element &&
             (node.hasAttribute(PANEL) ||
                 node.hasAttribute(PCT_MARK) ||
-                node.closest(OWN_MARKS) !== null)
+                node.closest(`[${PANEL}],[${PCT_MARK}]`) !== null)
         );
     }
 
-    const hasForeignNode = (list) => {
-        for (const node of list) {
-            if (!isOwnChange(node)) return true;
+    /**
+     * Start the MutationObserver and SPA-navigation listeners.
+     *
+     * React only to changes Ollama made: mutations inside this script's own
+     * nodes, or batches whose added/removed nodes are all its own, must not
+     * schedule another refresh or the observer would loop on itself. The
+     * attribute filter lists exactly the attributes the enhancements read.
+     *
+     *
+     * At document-start <html> may not exist yet; retry until it does.
+     */
+    function initObserverAndWiring() {
+        if (!document.documentElement) {
+            setTimeout(initObserverAndWiring, 4);
+            return;
         }
-        return false;
-    };
 
-    new MutationObserver((mutations) => {
-        for (const { target, addedNodes, removedNodes } of mutations) {
-            if (target instanceof Element && target.closest(OWN_MARKS)) {
-                continue;
-            }
-            if (
-                (!addedNodes.length && !removedNodes.length) ||
-                hasForeignNode(addedNodes) ||
-                hasForeignNode(removedNodes)
-            ) {
-                scheduleRefresh();
-                return;
-            }
-        }
-    }).observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: [
-            "aria-label",
-            "style",
-            OLLAMA.modelAttr,
-            OLLAMA.requestsAttr,
-            OLLAMA.timeAttr,
-        ],
-    });
+        new MutationObserver((mutations) => {
+            const externalChange = mutations.some(
+                ({ target, addedNodes, removedNodes }) => {
+                    if (
+                        target instanceof Element &&
+                        target.closest(`[${PANEL}],[${PCT_MARK}]`)
+                    ) {
+                        return false;
+                    }
+                    const changed = [...addedNodes, ...removedNodes];
+                    if (changed.length && changed.every(isOwnChange)) return false;
+                    return true;
+                },
+            );
+            if (externalChange) scheduleRefresh();
+        }).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: [
+                "aria-label",
+                "style",
+                "data-model",
+                "data-requests",
+                "data-time",
+            ],
+        });
 
-    window.addEventListener("popstate", scheduleRefresh);
-    window.addEventListener("hashchange", scheduleRefresh);
-    window.navigation?.addEventListener?.("navigate", scheduleRefresh);
-    scheduleRefresh();
+        // SPA navigation can change the URL and swap content; the observer
+        // covers DOM updates, these cover the navigation event itself.
+        window.addEventListener("popstate", scheduleRefresh);
+        window.addEventListener("hashchange", scheduleRefresh);
+        window.navigation?.addEventListener?.("navigate", scheduleRefresh);
+
+        scheduleRefresh();
+    }
+
+    // Dark theme first (pre-paint), then the observer + first refresh pass.
+    bootDark();
+    initObserverAndWiring();
 })();
