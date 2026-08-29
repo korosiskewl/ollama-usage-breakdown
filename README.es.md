@@ -3,52 +3,54 @@
 [![CodeQL](https://github.com/srnoob2570/ollama-usage-breakdown/actions/workflows/codeql.yml/badge.svg)](https://github.com/srnoob2570/ollama-usage-breakdown/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/srnoob2570/ollama-usage-breakdown/badge)](https://scorecard.dev/viewer/?uri=github.com/srnoob2570/ollama-usage-breakdown)
 
-Userscript de Tampermonkey que hace los medidores de uso de [ollama.com/settings](https://ollama.com/settings) mucho más legibles, con un desglose por modelo de tu uso de Ollama Cloud.
+**Créditos:** Este script de usuario fue creado originalmente por **srnoob0237** en Discord, y modificado por **manytricks**.
 
-![Medidor de sesión con desglose por modelo de peticiones y porcentajes](./docs/session.png) ![Medidor semanal con porcentajes por modelo](./docs/weekly.png)
+Un script de usuario para Tampermonkey que hace que los medidores de uso en [ollama.com/settings](https://ollama.com/settings) sean realmente legibles, con un desglose por modelo de tu uso de Ollama Cloud.
 
-> English version available: [README.md](./README.md)
+![Medidores de uso de sesión y semanales con desglose por modelo de solicitudes y porcentajes](./docs/session.png) ![Medidor semanal con porcentajes por modelo](./docs/weekly.png)
 
-> Este userscript está generado y actualizado con ayuda de IA. No está afiliado a Ollama ni cuenta con su respaldo. Consulta [el aviso completo](#aviso-generado-por-ia) más abajo.
+> También disponible en inglés: [README.md](./README.md)
+
+> Este script de usuario es generado y actualizado con asistencia de IA. No está afiliado ni respaldado por Ollama. Consulta el [descargo de responsabilidad completo](#descargo-de-responsabilidad-generado-por-ia) más abajo.
 
 ## Qué hace
 
-- **Desglose de sesión.** Añade una lista "Models used this session" debajo del medidor de sesión, con el mismo estilo que la lista nativa "Models used this week" de Ollama (punto de color, nombre del modelo, contador de peticiones) más una columna extra.
-- **Porcentaje por modelo.** Ollama solo reporta el "X% used" global. La parte de cada modelo existe únicamente en el HTML de la página, codificada como anchos de los segmentos de la barra. El script lee esos anchos, los reescala contra el uso global y muestra cuánto de tu límite total consumió cada modelo. Entre todos suman el X% que reporta Ollama (p. ej. `84.2%` de una sesión al `10.7%` → `9.01%`).
-- **Porcentajes también en la semanal.** Inyecta el mismo porcentaje reescalado en la lista nativa "Models used this week" de Ollama.
-- **Hora exacta de reset.** Añade la fecha y hora absolutas junto al tiempo relativo, p. ej. "Resets in 2 hours. (August 27, 2026 at 2:00 AM)".
-- Sobrevive a las actualizaciones de htmx y a la navegación SPA, y se limpia al salir de la página de ajustes.
+- **Desglose de sesión.** Agrega una lista de "Modelos usados en esta sesión" debajo del medidor de sesión, con el mismo estilo que la lista nativa de Ollama "Modelos usados esta semana" (punto de color, nombre del modelo, cantidad de solicitudes) más una columna adicional.
+- **Porcentajes por modelo.** Ollama solo muestra el "X% usado" global y el conteo de solicitudes. La participación de cada modelo solo existe en el HTML de la página, codificada como anchos de segmentos de la barra. El script lee esos anchos, los reescala contra el uso total y muestra cuánto de tu límite total consumió cada modelo. Juntos suman el X% que Ollama reporta (ej. `84.2%` de un `10.7%` de sesión → `9.01%`).
+- **Porcentajes semanales también.** Inyecta el mismo porcentaje reescalado en la lista nativa de "Modelos usados esta semana" de Ollama.
+- **Horas exactas de reinicio.** Agrega la fecha y hora absoluta junto a cada reinicio relativo, ej. "Reinicia en 2 horas. (27 de agosto de 2026 a las 2:00 AM)".
+- Sobrevive a actualizaciones htmx y navegación SPA, y se limpia solo cuando sales de la página de configuración.
 
 ## Instalación
 
 1. Instala [Tampermonkey](https://www.tampermonkey.net/) en tu navegador.
 2. Abre el script en crudo: <https://raw.githubusercontent.com/srnoob2570/ollama-usage-breakdown/main/ollama-usage-breakdown.user.js>
-3. Tampermonkey ofrecerá instalarlo. Después visita <https://ollama.com/settings>.
+3. Tampermonkey te ofrecerá instalarlo. Luego visita <https://ollama.com/settings>.
 
 ### Manual
 
-Abre el panel de Tampermonkey, crea un script nuevo, pega el contenido de [`ollama-usage-breakdown.user.js`](./ollama-usage-breakdown.user.js) y guarda. Después visita <https://ollama.com/settings>.
+Abre el panel de Tampermonkey, crea un nuevo script y pega el contenido de [`ollama-usage-breakdown.user.js`](./ollama-usage-breakdown.user.js). Guarda y luego visita <https://ollama.com/settings>.
 
 ## Notas
 
-- Los porcentajes se leen del HTML de Ollama (anchos de los segmentos de la barra), no de una API privada. Si Ollama cambia su estructura, puede hacer falta actualizar el script.
-- Solo se ejecuta en `https://ollama.com/settings` (URL exacta, no en `/settings/keys`, `/settings/billing` ni `/settings/profile`) y no requiere permisos especiales (`@grant none`).
+- Los porcentajes se leen de la página de Ollama (anchos de segmentos de la barra), no de una API privada. Si Ollama cambia su marcado, es posible que el script necesite una actualización.
+- El script solo se ejecuta en `https://ollama.com/settings` (URL exacta, no en `/settings/keys`, `/settings/billing` o `/settings/profile`) y no necesita permisos especiales (`@grant none`).
 
 ## Seguridad
 
-Este script corre en tu navegador, así que no tienes que confiar en él a ciegas:
+Este script se ejecuta en tu navegador, por lo que nunca debes confiar ciegamente en él:
 
-- Un solo archivo legible: [`ollama-usage-breakdown.user.js`](./ollama-usage-breakdown.user.js) — sin build, sin ofuscación, sin dependencias.
-- Sin APIs privilegiadas de userscript (`@grant none`): sin peticiones cross-origin, sin acceso a otras pestañas, al portapapeles o al almacenamiento de Tampermonkey. Todo lo que muestra se parsea del DOM de la propia página.
-- Solo se ejecuta en `https://ollama.com/settings` (URL exacta) y solo lee lo que esa página ya te muestra.
-- Cada push y cada pull request se escanean automáticamente con [CodeQL](https://github.com/srnoob2570/ollama-usage-breakdown/security/code-scanning), las queries de seguridad de GitHub.
+- Un único archivo legible: [`ollama-usage-breakdown.user.js`](./ollama-usage-breakdown.user.js) — sin pasos de compilación, sin ofuscación, sin dependencias.
+- Sin APIs de scripts de usuario privilegiadas (`@grant none`): sin solicitudes entre orígenes, sin acceso a otras pestañas, al portapapeles o al almacenamiento de Tampermonkey. Todo lo que muestra se analiza del DOM de la página.
+- Se ejecuta solo en `https://ollama.com/settings` (URL exacta) y solo lee lo que la página ya te muestra.
+- Cada push y pull request se escanea automáticamente con [CodeQL](https://github.com/srnoob2570/ollama-usage-breakdown/security/code-scanning) usando las consultas de seguridad de GitHub.
 
-Las badges de arriba no prueban la ausencia de malware — ninguna badge puede. Lee el script antes de instalarlo y revisa el diff que Tampermonkey muestra en cada actualización.
+Las insignias de arriba no demuestran la ausencia de malware — ninguna insignia puede hacerlo. Lee el script antes de instalarlo y revisa el diff que Tampermonkey muestra en cada actualización.
 
-## Aviso: generado por IA
+## Descargo de responsabilidad: Generado por IA
 
-Este userscript está escrito y mantenido con ayuda de IA. No está afiliado a Ollama, ni respaldado por ella, ni conectado con ella de ninguna forma.
+Este script de usuario está escrito y mantenido con la ayuda de IA. No está afiliado, respaldado ni conectado a Ollama de ninguna manera.
 
-- La IA escribe el código y un humano lo revisa antes de cada publicación. Los dos pueden equivocarse, así que puede contener errores o dejar de funcionar si Ollama cambia su web.
-- Úsalo bajo tu propia responsabilidad y revisa siempre un userscript antes de instalarlo.
-- Los issues y pull requests son bienvenidos, incluidas las correcciones de todo aquello que la IA haya hecho mal.
+- La IA lo escribe y un humano lo revisa antes de cada lanzamiento. Ambos pueden equivocarse, por lo que aún puede contener errores o romperse cuando Ollama cambie su sitio web.
+- Úsalo bajo tu propio riesgo, y siempre revisa un script de usuario antes de instalarlo.
+- Las incidencias y solicitudes de extracción son bienvenidas, incluyendo correcciones para cualquier error de la IA.
