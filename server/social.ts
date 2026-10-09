@@ -353,3 +353,6 @@ export async function pageUsers(
   const last = page[page.length - 1];
   return { items: page.map(toSummary), nextCursor: rows.length > limit && last ? encodeCursor([last.at, last.id]) : null };
 }
+
+/** Viewer id for read endpoints; a suspended account's session reads as signed out. */
+export const activeViewerId = (u: UserRow | null | undefined): string | null => (u && u.status === 'active' ? u.id : null);

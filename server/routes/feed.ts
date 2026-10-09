@@ -1,9 +1,10 @@
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import type { FeedItem, Page, Post, UserSummary } from '../../shared/types';
 import { type D1Like, isoReq, placeholders } from '../db';
 import type { AppEnv } from '../env';
 import { badRequest, decodeCursor, encodeCursor, forbidden, isTimeKey, notFound, pageSize, requireUser } from '../http';
 import {
+  activeViewerId,
   canView,
   getSettings,
   getSummaries,
@@ -35,11 +36,6 @@ interface ConversationItem {
 
 const MAX_ROUNDS = 4;
 const CONVERSATION_WINDOW_MS = 7 * 24 * 3600 * 1000;
-
-const viewerOf = (c: Context<AppEnv>) => {
-  const u = c.get('user');
-  return u && u.status === 'active' ? u.id : null;
-};
 
 const cursorSql = (cursor: TimeKey | null, at: string, key: string) =>
   cursor ? { sql: `AND (${at} < ? OR (${at} = ? AND ${key} < ?))`, params: [cursor[0], cursor[0], cursor[1]] } : { sql: '', params: [] };
@@ -176,7 +172,7 @@ feedRoutes.get('/feed/home', async (c) => {
 // ---------------------------------------------------------------------------- explore
 
 feedRoutes.get('/feed/explore', async (c) => {
-  const viewer = viewerOf(c);
+  const viewer = activeViewerId(c.get('user'));
   const db = c.env.DB;
   const muted = viewer ? (await getSettings(db, viewer)).mutedWords : [];
   const cursor = decodeCursor(c.req.query('cursor'), isTimeKey);
@@ -193,7 +189,7 @@ feedRoutes.get('/feed/explore', async (c) => {
 // ---------------------------------------------------------------------------- conversations
 
 feedRoutes.get('/feed/conversations', async (c) => {
-  const viewer = viewerOf(c);
+  const viewer = activeViewerId(c.get('user'));
   const db = c.env.DB;
   const muted = viewer ? (await getSettings(db, viewer)).mutedWords : [];
   const since = Date.now() - CONVERSATION_WINDOW_MS;
@@ -274,7 +270,7 @@ feedRoutes.get('/feed/conversations', async (c) => {
 // ---------------------------------------------------------------------------- profile posts
 
 feedRoutes.get('/users/:handle/posts', async (c) => {
-  const viewer = viewerOf(c);
+  const viewer = activeViewerId(c.get('user'));
   const db = c.env.DB;
   const tab = c.req.query('tab') ?? 'posts';
   if (tab !== 'posts' && tab !== 'replies') throw badRequest('Unknown tab.');

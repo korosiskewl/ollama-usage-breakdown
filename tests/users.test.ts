@@ -187,7 +187,7 @@ describe('profiles & follows', () => {
 });
 
 describe('avatars', () => {
-  async function upload(s: ReturnType<typeof setup>, c: Client, type: string, bytes: Uint8Array) {
+  async function upload(s: ReturnType<typeof setup>, c: Client, type: string, bytes: Uint8Array<ArrayBuffer>) {
     const res = await s.app.request(
       'http://relay.test/api/me/avatar',
       { method: 'POST', headers: { 'x-relay-client': '1', cookie: c.cookie, 'content-type': type }, body: bytes },
@@ -234,10 +234,10 @@ describe('avatars', () => {
   });
 
   it('uses the R2 bucket when bound', async () => {
-    const store = new Map<string, { bytes: Uint8Array; type?: string }>();
+    const store = new Map<string, { bytes: Uint8Array<ArrayBuffer>; type?: string }>();
     const MEDIA = {
       async put(key: string, value: ArrayBuffer | Uint8Array, opts?: { httpMetadata?: { contentType?: string } }) {
-        store.set(key, { bytes: new Uint8Array(value), type: opts?.httpMetadata?.contentType });
+        store.set(key, { bytes: Uint8Array.from(value instanceof ArrayBuffer ? new Uint8Array(value) : value), type: opts?.httpMetadata?.contentType });
       },
       async get(key: string) {
         const o = store.get(key);

@@ -1,4 +1,4 @@
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Post, ReaderView, Thread } from '../../shared/types';
 import { LIMITS, charCount, extractMentions } from '../../shared/limits';
@@ -8,6 +8,7 @@ import { body, cleanText, decodeCursor, encodeCursor, forbidden, isString, notFo
 import { rateLimit } from '../ratelimit';
 import {
   type UserCols,
+  activeViewerId,
   canView,
   hydrateList,
   hydratePosts,
@@ -23,11 +24,6 @@ export const postRoutes = new Hono<AppEnv>();
 
 const MAX_ANCESTORS = 50;
 const MAX_READER_POSTS = 100;
-
-const viewerOf = (c: Context<AppEnv>) => {
-  const u = c.get('user');
-  return u && u.status === 'active' ? u.id : null;
-};
 
 /** Post body: cleaned, then 1..LIMITS.post.max graphemes. The raw cap stops huge combining-mark payloads. */
 export const postBodySchema = z
@@ -135,7 +131,7 @@ postRoutes.post('/posts', async (c) => {
 });
 
 postRoutes.get('/posts/:id', async (c) => {
-  const post = await hydrateOne(c.env.DB, viewerOf(c), c.req.param('id'));
+  const post = await hydrateOne(c.env.DB, activeViewerId(c.get('user')), c.req.param('id'));
   if (!post || post.unavailable) throw notFound('Post not found.');
   return c.json(post);
 });
@@ -224,7 +220,7 @@ postRoutes.delete('/posts/:id/repost', async (c) => {
 });
 
 postRoutes.get('/posts/:id/likes', async (c) => {
-  const viewer = viewerOf(c);
+  const viewer = activeViewerId(c.get('user'));
   const db = c.env.DB;
   const p = await loadVisible(db, viewer, c.req.param('id'));
   if (p.deleted) return c.json({ items: [], nextCursor: null });
@@ -243,7 +239,7 @@ postRoutes.get('/posts/:id/likes', async (c) => {
 // ---------------------------------------------------------------------------- threads
 
 postRoutes.get('/posts/:id/thread', async (c) => {
-  const viewer = viewerOf(c);
+  const viewer = activeViewerId(c.get('user'));
   const db = c.env.DB;
   const id = c.req.param('id');
   const post = await hydrateOne(db, viewer, id);
@@ -295,7 +291,7 @@ postRoutes.get('/posts/:id/thread', async (c) => {
 });
 
 postRoutes.get('/posts/:id/reader', async (c) => {
-  const viewer = viewerOf(c);
+  const viewer = activeViewerId(c.get('user'));
   const db = c.env.DB;
   const start = await loadVisible(db, viewer, c.req.param('id'));
   const root = start.rootId === start.id ? start : await loadVisible(db, viewer, start.rootId);

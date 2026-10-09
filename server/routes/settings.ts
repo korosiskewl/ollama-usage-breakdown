@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Settings } from '../../shared/types';
 import { LIMITS, charCount } from '../../shared/limits';
 import type { AppEnv } from '../env';
-import { body, requireUser } from '../http';
+import { body, cleanText, requireUser } from '../http';
 import { getSettings } from '../social';
 
 export const settingsRoutes = new Hono<AppEnv>();
@@ -12,7 +12,7 @@ const mutedWordsSchema = z
   .array(z.string().max(200))
   .max(LIMITS.mutedWord.count * 4)
   // Lowercase, trim, collapse inner whitespace, drop empties and duplicates.
-  .transform((words) => [...new Set(words.map((w) => w.replace(/\s+/g, ' ').trim().toLowerCase()).filter(Boolean))])
+  .transform((words) => [...new Set(words.map((w) => cleanText(w).replace(/\s+/g, ' ').toLowerCase()).filter(Boolean))])
   .refine((ws) => ws.every((w) => charCount(w) <= LIMITS.mutedWord.max), `Muted words are at most ${LIMITS.mutedWord.max} characters.`)
   .refine((ws) => ws.length <= LIMITS.mutedWord.count, `You can mute at most ${LIMITS.mutedWord.count} words.`);
 

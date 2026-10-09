@@ -131,6 +131,12 @@ describe('home feed', () => {
     const { items } = await allPages(alice, '/api/feed/home', 4);
     expect(bodies(items)).toEqual([own.body, ...keep]);
 
+    // A long run of filtered rows still pages through correctly (pages may come back short).
+    for (let i = 0; i < 20; i++) await bob.post('/api/posts', { body: `spoiler number ${i}` });
+    const after = await bob.post('/api/posts', { body: 'after the spoilers' });
+    const clustered = await allPages(alice, '/api/feed/home', 2);
+    expect(bodies(clustered.items)).toEqual([after.body.body, own.body, ...keep]);
+
     // Muting a user removes their posts and their reposts.
     const c = (await carol.post('/api/posts', { body: 'carol says hi' })).body;
     await bob.post(`/api/posts/${c.id}/repost`);

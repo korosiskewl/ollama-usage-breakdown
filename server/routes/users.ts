@@ -6,16 +6,10 @@ import { type D1Like, isoReq, newId } from '../db';
 import type { AppEnv, UserRow } from '../env';
 import { ApiError, badRequest, body, cleanText, forbidden, notFound, pageSize, requireUser } from '../http';
 import { rateLimit } from '../ratelimit';
-import { USER_COLS, canView, getUserByHandle, isBlockedEitherWay, listableUserSql, mediaUrl, notify, pageUsers, toSummary } from '../social';
+import { USER_COLS, activeViewerId, canView, getUserByHandle, isBlockedEitherWay, listableUserSql, mediaUrl, notify, pageUsers, toSummary } from '../social';
 import { buildMe, displayNameSchema } from './auth';
 
 export const userRoutes = new Hono<AppEnv>();
-
-/** Id of the signed-in, non-suspended viewer (reads treat suspended sessions as signed out). */
-const viewerOf = (c: Context<AppEnv>) => {
-  const u = c.get('user');
-  return u && u.status === 'active' ? u.id : null;
-};
 
 async function findUser(db: D1Like, handle: string): Promise<UserRow> {
   const h = handle.replace(/^@/, '');
@@ -52,7 +46,7 @@ async function relation(db: D1Like, me: string, other: string): Promise<ProfileV
 
 userRoutes.get('/users/:handle', async (c) => {
   const db = c.env.DB;
-  const me = viewerOf(c);
+  const me = activeViewerId(c.get('user'));
   const u = await findUser(db, c.req.param('handle'));
   const viewer = me && me !== u.id ? await relation(db, me, u.id) : null;
   if (viewer?.blockedBy) throw notFound('No such user.');
@@ -218,7 +212,7 @@ userRoutes.get('/media/:key{.+}', async (c) => {
 
 async function graphList(c: Context<AppEnv>, handle: string, dir: 'followers' | 'following') {
   const db = c.env.DB;
-  const me = viewerOf(c);
+  const me = activeViewerId(c.get('user'));
   const u = await findUser(db, handle);
   if (me !== u.id) {
     if (me && (await isBlockedBy(db, u.id, me))) throw notFound('No such user.');

@@ -54,6 +54,8 @@ CREATE INDEX posts_author ON posts(author_id, id DESC);
 CREATE INDEX posts_reply_to ON posts(reply_to_id, id);
 CREATE INDEX posts_root ON posts(root_id, id);
 CREATE INDEX posts_recent ON posts(id DESC) WHERE deleted_at IS NULL;
+CREATE INDEX posts_created ON posts(created_at DESC, id DESC) WHERE deleted_at IS NULL;
+CREATE INDEX posts_replies_recent ON posts(created_at) WHERE reply_to_id IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE mentions (
   post_id TEXT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
