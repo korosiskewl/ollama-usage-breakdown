@@ -1,0 +1,4 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit .dev.vars.
+COOKIE_SECURE=false
+ADMIN_HANDLES=yourhandle
+# ANTHROPIC_API_KEY=sk-ant-...

@@ -1,0 +1,115 @@
+/*
+  Relay 3.0 visual system — "broadsheet with a signal".
+  Paper and ink neutrals, a single vermilion signal accent, serif reading text,
+  a tight grotesk for interface chrome and a mono for metadata.
+*/
+:root {
+  --font-read: 'Newsreader Variable', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-ui: 'Inter Tight Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Reading size is user-adjustable (Settings → Appearance). */
+  --read-size: 1.125rem;
+  --read-leading: 1.52;
+
+  --paper: #f3efe6;
+  --paper-raised: #f9f6f0;
+  --paper-sunk: #ebe5d8;
+  --ink: #1a1813;
+  --ink-2: #4a463d;
+  --ink-3: #7a7466;
+  --rule: #d9d1c0;
+  --rule-strong: #b9b09c;
+  --signal: #d4412a;
+  --signal-ink: #b5341f;
+  --signal-wash: #f7dcd3;
+  --on-signal: #fffaf3;
+  --moss: #3f6b4a;
+  --moss-wash: #dde8dc;
+  --amber: #9a6a12;
+  --amber-wash: #f3e6c8;
+  --danger: #b3261e;
+  --danger-wash: #f6d9d5;
+  --focus: #d4412a;
+  --shadow-pop: 0 1px 0 rgba(26, 24, 19, 0.04), 0 12px 32px -12px rgba(26, 24, 19, 0.28);
+
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-pill: 999px;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+
+  --col: 640px;
+  --rail-left: 232px;
+  --rail-right: 300px;
+  --topbar-h: 52px;
+  --tabbar-h: 58px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-med: 200ms;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --paper: #14130f;
+  --paper-raised: #1c1a15;
+  --paper-sunk: #0e0d0a;
+  --ink: #ece6d8;
+  --ink-2: #bdb5a4;
+  --ink-3: #8a8373;
+  --rule: #2d2a23;
+  --rule-strong: #4a4539;
+  --signal: #f0684a;
+  --signal-ink: #ff8a6f;
+  --signal-wash: #3a1d16;
+  --on-signal: #1a0c08;
+  --moss: #8cc39a;
+  --moss-wash: #1c2b20;
+  --amber: #e2b45c;
+  --amber-wash: #30260f;
+  --danger: #ff8a80;
+  --danger-wash: #3a1714;
+  --focus: #f0684a;
+  --shadow-pop: 0 1px 0 rgba(0, 0, 0, 0.3), 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #14130f;
+    --paper-raised: #1c1a15;
+    --paper-sunk: #0e0d0a;
+    --ink: #ece6d8;
+    --ink-2: #bdb5a4;
+    --ink-3: #8a8373;
+    --rule: #2d2a23;
+    --rule-strong: #4a4539;
+    --signal: #f0684a;
+    --signal-ink: #ff8a6f;
+    --signal-wash: #3a1d16;
+    --on-signal: #1a0c08;
+    --moss: #8cc39a;
+    --moss-wash: #1c2b20;
+    --amber: #e2b45c;
+    --amber-wash: #30260f;
+    --danger: #ff8a80;
+    --danger-wash: #3a1714;
+    --focus: #f0684a;
+    --shadow-pop: 0 1px 0 rgba(0, 0, 0, 0.3), 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+    color-scheme: dark;
+  }
+}
+
+:root[data-text='s'] { --read-size: 1rem; }
+:root[data-text='l'] { --read-size: 1.25rem; --read-leading: 1.5; }
+:root[data-text='xl'] { --read-size: 1.4rem; --read-leading: 1.48; }
+:root[data-readfont='sans'] { --font-read: var(--font-ui); --read-leading: 1.5; }

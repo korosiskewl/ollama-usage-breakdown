@@ -1,0 +1,17 @@
+{
+  // Relay 3.0 Worker: serves the API under /api and the built SPA from ./dist.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "relay3",
+  "main": "server/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "relay", "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID", "migrations_dir": "migrations" }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "relay-media" }],
+  "vars": {
+    "ADMIN_HANDLES": "",
+    "AI_MODEL": "claude-sonnet-5-5"
+  }
+  // Secrets (set with `wrangler secret put`): ANTHROPIC_API_KEY (optional)
+}
