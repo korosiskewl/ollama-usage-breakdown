@@ -300,7 +300,7 @@ function CollectionEntry({
             aria-invalid={over || undefined}
           />
           <div className="coll-note-edit-foot">
-            <span className={over ? 'meta counter-over' : 'meta'}>
+            <span className={over ? 'meta sc-over' : 'meta'}>
               {len} / {LIMITS.collectionNote.max}
             </span>
             <span className="coll-note-edit-actions">
@@ -349,7 +349,7 @@ function CollectionEntry({
           >
             {item.note ? 'edit note' : 'add note'}
           </button>
-          <button className="act act-danger" onClick={onRemove}>
+          <button className="act sc-act-danger" onClick={onRemove}>
             remove
           </button>
         </div>

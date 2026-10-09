@@ -1,4 +1,5 @@
-// STUB — to be implemented.
+import { NotFoundState } from '../components/NotFoundState';
+
 export default function NotFound(_props: { params: Record<string, string> }) {
-  return <div className="page-stub">NotFound</div>;
+  return <NotFoundState heading="h1" />;
 }

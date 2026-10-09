@@ -73,7 +73,7 @@ export function CollectionFormDialog({
     >
       <form
         id={`${uid}-form`}
-        className="stack-form"
+        className="sc-stack"
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
@@ -91,16 +91,16 @@ export function CollectionFormDialog({
             aria-describedby={`${uid}-title-hint`}
             placeholder="e.g. Notes on slow software"
           />
-          <div className="report-hint-row" id={`${uid}-title-hint`}>
+          <div className="sc-hint-row" id={`${uid}-title-hint`}>
             <span className="field-error">{fields.title}</span>
-            <span className={tOver ? 'meta counter-over' : 'meta'}>
+            <span className={tOver ? 'meta sc-over' : 'meta'}>
               {tLen} / {LIMITS.collectionTitle.max}
             </span>
           </div>
         </div>
         <div className="field">
           <label htmlFor={`${uid}-desc`}>
-            Description <span className="report-optional">(optional)</span>
+            Description <span className="sc-optional">(optional)</span>
           </label>
           <textarea
             id={`${uid}-desc`}
@@ -112,9 +112,9 @@ export function CollectionFormDialog({
             aria-describedby={`${uid}-desc-hint`}
             placeholder="What ties these posts together?"
           />
-          <div className="report-hint-row" id={`${uid}-desc-hint`}>
+          <div className="sc-hint-row" id={`${uid}-desc-hint`}>
             <span className="field-error">{fields.description}</span>
-            <span className={dOver ? 'meta counter-over' : 'meta'}>
+            <span className={dOver ? 'meta sc-over' : 'meta'}>
               {dLen} / {LIMITS.collectionDescription.max}
             </span>
           </div>
@@ -122,7 +122,7 @@ export function CollectionFormDialog({
         <label className="switch">
           <span>
             <span className="label">Public</span>
-            <span className="hint switch-hint">
+            <span className="hint sc-switch-hint">
               {draft.isPublic
                 ? 'Anyone who can see your profile can read it.'
                 : 'Only you can see this collection and what’s in it.'}

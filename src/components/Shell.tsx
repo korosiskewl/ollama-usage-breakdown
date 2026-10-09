@@ -25,12 +25,11 @@ export function Wordmark({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   );
 }
 
+/** The signal: a vermilion full stop. Used after the wordmark, in notices and as the reader's end mark. */
 export function SignalMark({ className = 'wordmark-signal' }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-      <circle cx="3" cy="11" r="2.1" />
-      <path d="M3 6.2a4.8 4.8 0 0 1 4.8 4.8" />
-      <path d="M3 2a9 9 0 0 1 9 9" />
+    <svg className={className} viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+      <circle cx="5" cy="5" r="5" />
     </svg>
   );
 }
@@ -392,16 +391,16 @@ export function Shell({ children }: { children: ReactNode }) {
       >
         Skip to content
       </a>
-      <PreviewBanner />
-      {!online && (
-        <div className="banner banner-offline" role="status">
-          <span className="banner-dot" aria-hidden="true" />
-          <p>You’re offline. Reading what’s already loaded still works; posting and refreshing will resume when you reconnect.</p>
-        </div>
-      )}
       <div className="shell" data-layout={layout}>
         <LeftRail nav={nav} />
         <div className="shell-center">
+          <PreviewBanner />
+          {!online && (
+            <div className="banner banner-offline" role="status">
+              <span className="banner-dot" aria-hidden="true" />
+              <p>You’re offline. What’s already loaded still reads fine; posting and refreshing resume when you reconnect.</p>
+            </div>
+          )}
           <TopBar path={path} />
           <main id="main" ref={mainRef} tabIndex={-1} className="shell-main">
             {children}

@@ -106,7 +106,7 @@ export function SaveToCollectionDialog({ post, onClose }: { post: Post; onClose:
 
         <div className="field">
           <label htmlFor={`${uid}-note`}>
-            Your note <span className="report-optional">(optional)</span>
+            Your note <span className="sc-optional">(optional)</span>
           </label>
           <textarea
             id={`${uid}-note`}
@@ -118,9 +118,9 @@ export function SaveToCollectionDialog({ post, onClose }: { post: Post; onClose:
             aria-invalid={noteOver || undefined}
             aria-describedby={`${uid}-note-hint`}
           />
-          <div className="report-hint-row" id={`${uid}-note-hint`}>
+          <div className="sc-hint-row" id={`${uid}-note-hint`}>
             <span className="hint">Added with the post to any collection you tick below.</span>
-            <span className={noteOver ? 'meta counter-over' : 'meta'}>
+            <span className={noteOver ? 'meta sc-over' : 'meta'}>
               {noteLen} / {LIMITS.collectionNote.max}
             </span>
           </div>
@@ -141,7 +141,7 @@ export function SaveToCollectionDialog({ post, onClose }: { post: Post; onClose:
                   <label className="save-row" data-busy={pending.has(c.id) || undefined}>
                     <input
                       type="checkbox"
-                      className="check"
+                      className="sc-check"
                       checked={!!c.containsPost}
                       onChange={() => void toggle(c)}
                       disabled={pending.has(c.id)}
@@ -188,7 +188,7 @@ export function SaveToCollectionDialog({ post, onClose }: { post: Post; onClose:
             </button>
           </div>
           <label className="save-private">
-            <input type="checkbox" className="check" checked={newPrivate} onChange={(e) => setNewPrivate(e.target.checked)} />
+            <input type="checkbox" className="sc-check" checked={newPrivate} onChange={(e) => setNewPrivate(e.target.checked)} />
             Private — only you can see it
           </label>
           {createError && (

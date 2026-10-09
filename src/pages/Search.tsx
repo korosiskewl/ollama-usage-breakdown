@@ -40,19 +40,25 @@ export default function Search(_props: { params: Record<string, string> }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const typeRef = useRef(type);
   typeRef.current = type;
+  const pushed = useRef<string | null>(null);
+  const go = (q: string, t: SearchType) => {
+    pushed.current = q;
+    navigate(searchUrl(q, t), { replace: true });
+  };
 
-  // Keep the box in sync when the URL changes from elsewhere (back/forward, a link).
+  // Keep the box in sync when the URL changes from elsewhere (back/forward, a link) — not when we wrote it ourselves.
   const [prevUrlQ, setPrevUrlQ] = useState(urlQ);
   if (urlQ !== prevUrlQ) {
     setPrevUrlQ(urlQ);
-    if (urlQ.trim() !== text.trim()) setText(urlQ);
+    if (urlQ !== pushed.current && urlQ.trim() !== text.trim()) setText(urlQ);
   }
 
   // Debounce typing into the URL; the URL is the source of truth for results.
   useEffect(() => {
     if (text.trim() === urlQ.trim()) return;
-    const t = window.setTimeout(() => navigate(searchUrl(text.trim(), typeRef.current), { replace: true }), 300);
+    const t = window.setTimeout(() => go(text.trim(), typeRef.current), 300);
     return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, urlQ]);
 
   useEffect(() => {
@@ -71,18 +77,18 @@ export default function Search(_props: { params: Record<string, string> }) {
           className="search-form"
           onSubmit={(e) => {
             e.preventDefault();
-            navigate(searchUrl(text.trim(), type), { replace: true });
+            go(text.trim(), type);
           }}
         >
           <label htmlFor="search-input" className="sr-only">
             Search Relay
           </label>
-          <span className="search-field">
+          <span className="sc-search-field">
             <Icon name="search" size={18} />
             <input
               ref={inputRef}
               id="search-input"
-              className="input search-input"
+              className="input sc-search-input"
               type="search"
               enterKeyHint="search"
               autoComplete="off"
@@ -99,7 +105,7 @@ export default function Search(_props: { params: Record<string, string> }) {
                 aria-label="Clear search"
                 onClick={() => {
                   setText('');
-                  navigate(searchUrl('', type), { replace: true });
+                  go('', type);
                   inputRef.current?.focus();
                 }}
               >
@@ -115,7 +121,7 @@ export default function Search(_props: { params: Record<string, string> }) {
               role="tab"
               aria-selected={type === t}
               aria-controls="search-results"
-              onClick={() => navigate(searchUrl(text.trim(), t), { replace: true })}
+              onClick={() => go(text.trim(), t)}
             >
               {t === 'users' ? 'People' : 'Posts'}
             </button>

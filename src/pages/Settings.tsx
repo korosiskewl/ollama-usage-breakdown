@@ -44,7 +44,7 @@ function useSaved() {
 
 function SavedNote({ on }: { on: boolean }) {
   return (
-    <span className="saved" data-on={on || undefined} role="status" aria-live="polite">
+    <span className="sc-saved" data-on={on || undefined} role="status" aria-live="polite">
       {on && (
         <>
           <Icon name="check" size={14} /> Saved
@@ -79,19 +79,21 @@ function Group({ title, children, note }: { title: string; children: ReactNode; 
   );
 }
 
-/** Live session `me` plus a ref that always holds the newest value (for optimistic updates that overlap). */
+// The newest `me`, shared by every optimistic update on this page so overlapping saves never clobber each other.
+const latestMe: { current: Me | null } = { current: null };
+
+/** Live session `me` plus a shared ref that always holds the newest value (for optimistic updates that overlap). */
 function useMeRef() {
   const { me, setMe } = useSession();
-  const ref = useRef(me);
-  ref.current = me;
+  latestMe.current = me;
   const put = useCallback(
     (m: Me) => {
-      ref.current = m;
+      latestMe.current = m;
       setMe(m);
     },
     [setMe],
   );
-  return { ref, put };
+  return { ref: latestMe, put };
 }
 
 /** Optimistic PATCH /me/settings: applies locally, keeps the server's normalised value, rolls back on failure. */
@@ -236,7 +238,7 @@ export default function Settings({ params }: { params: Record<string, string> })
                 <Link
                   to={`/settings/${s.id}`}
                   className="set-nav-link"
-                  aria-current={s.id === active && (requested || undefined) ? 'page' : s.id === active ? 'true' : undefined}
+                  aria-current={s.id === active ? 'page' : undefined}
                   onClick={(e) => {
                     // Keep the history stack shallow when hopping between sections.
                     if (requested && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
@@ -366,8 +368,8 @@ function AccountSection({ me }: { me: Me }) {
       <Group title="Delete account">
         <div className="set-danger">
           <p>
-            Deleting your account removes your profile, posts, messages and collections, and frees your handle after a while. This can’t be
-            undone.
+            Deleting your account removes your profile, follows, likes, collections and the messages you’ve sent, and releases your handle.
+            This can’t be undone.
           </p>
           <button className="btn btn-danger" onClick={() => setDeleting(true)}>
             <Icon name="trash" size={16} />
@@ -451,7 +453,7 @@ function PasswordForm({ onChanged }: { onChanged: () => void }) {
 
   return (
     <form
-      className="stack-form set-password"
+      className="sc-stack set-password"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -599,15 +601,15 @@ function DeleteAccountDialog({ me, onClose }: { me: Me; onClose: () => void }) {
     >
       <form
         id={`${uid}-form`}
-        className="stack-form"
+        className="sc-stack"
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
         }}
       >
         <p className="notice notice-danger">
-          Your profile, posts, messages, collections and follows will be removed. Replies other people wrote stay, but point to a deleted
-          post. This can’t be undone.
+          Your posts become “deleted” placeholders so other people’s replies keep their context. Your profile, follows, likes, collections
+          and sent messages are removed, and @{me.handle} becomes available to others. This can’t be undone.
         </p>
         <div className="field">
           <label htmlFor={`${uid}-pw`}>Your password</label>
@@ -842,13 +844,13 @@ function MutingSection({ me }: { me: Me }) {
       {words.length === 0 ? (
         <p className="set-empty">Nothing muted. Mute a topic before a big game, a finale or a news cycle you’d rather skip.</p>
       ) : (
-        <ul className="chips" role="list">
+        <ul className="sc-chips" role="list">
           {words.map((w) => (
-            <li key={w} className="chip">
+            <li key={w} className="sc-chip">
               <span>{w}</span>
               <button
                 type="button"
-                className="chip-x"
+                className="sc-chip-x"
                 aria-label={`Unmute “${w}”`}
                 onClick={() => void patch({ mutedWords: words.filter((x) => x !== w) })}
               >

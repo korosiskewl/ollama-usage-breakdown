@@ -10,6 +10,7 @@ import './styles/base.css';
 import './styles/components.css';
 import './styles/shell.css';
 import './styles/pages.css';
+import './styles/social.css';
 import { applyPrefs } from './lib/prefs';
 import { App } from './App';
 

@@ -121,7 +121,7 @@ export function ReportDialog({ target, onClose }: { target: { type: 'post' | 'us
         )}
         <div className="field">
           <label htmlFor={detailsId}>
-            Details <span className="report-optional">{reason === 'other' ? '(required)' : '(optional)'}</span>
+            Details <span className="sc-optional">{reason === 'other' ? '(required)' : '(optional)'}</span>
           </label>
           <textarea
             id={detailsId}
@@ -133,11 +133,11 @@ export function ReportDialog({ target, onClose }: { target: { type: 'post' | 'us
             aria-describedby={`${detailsId}-hint`}
             placeholder="Anything that helps a moderator understand the context."
           />
-          <div className="report-hint-row" id={`${detailsId}-hint`}>
+          <div className="sc-hint-row" id={`${detailsId}-hint`}>
             <span className="hint">
               Read the <Link to="/rules">community rules</Link>.
             </span>
-            <span className={over ? 'meta counter-over' : 'meta'}>
+            <span className={over ? 'meta sc-over' : 'meta'}>
               {len} / {LIMITS.reportDetails.max}
             </span>
           </div>
