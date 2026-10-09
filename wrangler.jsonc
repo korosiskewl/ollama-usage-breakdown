@@ -11,7 +11,7 @@
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "relay-media" }],
   "vars": {
     "ADMIN_HANDLES": "",
-    "AI_MODEL": "claude-sonnet-5-5"
+    "AI_MODEL": "claude-opus-5-5"
   }
   // Secrets (set with `wrangler secret put`): ANTHROPIC_API_KEY (optional)
 }

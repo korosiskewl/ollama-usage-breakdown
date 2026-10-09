@@ -145,4 +145,4 @@ Muted words are lowercased, trimmed, de-duplicated, each ≤ 40 chars, max 50.
 | Method | Path | Body | Response |
 |---|---|---|---|
 | GET | /ai/status | – | `AiStatus` – `available` is false when `ANTHROPIC_API_KEY` is unset |
-| POST | /ai/assist | `{mode: AiMode, text?, postId?}` | `{suggestion: string, model: string}`. Requires sign-in and `settings.aiEnabled`. `improve`/`shorten`/`clarify` take `text` (≤ 500 graphemes); `summarize_thread` takes `postId` and uses only posts visible to the viewer. 503 `ai_unavailable` when unconfigured. Rate limit 20/hour. Nothing is ever posted automatically. |
+| POST | /ai/assist | `{mode: AiMode, text?, postId?}` | `{suggestion: string, model: string}`. Requires sign-in and `settings.aiEnabled`. `improve`/`shorten`/`clarify` take `text` (≤ 500 graphemes); `summarize_thread` takes `postId` and uses only posts visible to the viewer. 503 `ai_unavailable` when unconfigured, 422 `ai_declined` when the model refuses, 502 `ai_failed` on provider errors. Rate limit 20/hour. Nothing is ever posted automatically. Uses the official Anthropic SDK, default model `claude-opus-5-5` at low effort, with server-side refusal fallbacks. |

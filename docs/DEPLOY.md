@@ -51,7 +51,7 @@ rate-limit rows via the Worker's `scheduled` handler.
 | `DB` | D1 binding | primary database |
 | `MEDIA` | R2 binding | avatars (optional; falls back to D1 blobs) |
 | `ADMIN_HANDLES` | var | comma-separated handles granted admin on signup/login |
-| `AI_MODEL` | var | Anthropic model id for the assistant (default `claude-sonnet-5-5`) |
+| `AI_MODEL` | var | Anthropic model id for the assistant (default `claude-opus-5-5`) |
 | `ANTHROPIC_API_KEY` | secret | enables the optional AI assistant |
 | `COOKIE_SECURE` | var | `false` only for plain-http local dev |
 | `FIRST_USER_ADMIN`, `HEADER_SESSIONS`, `DISABLE_RATE_LIMITS` | var | **preview/test only — never set in production** |

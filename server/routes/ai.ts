@@ -9,11 +9,13 @@ import { getSettings, hydrateList, visibleAuthorSql } from '../social';
 
 export const aiRoutes = new Hono<AppEnv>();
 
-const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = 'claude-sonnet-5-5';
-const MAX_TOKENS = 700;
+const DEFAULT_MODEL = 'claude-opus-5-5';
+// Thinking tokens count toward max_tokens on current models, so leave headroom above the ~500-char output.
+const MAX_TOKENS = 4000;
 const THREAD_MAX_POSTS = 60;
 const TIMEOUT_MS = 30_000;
+// Models that accept the server-side refusal fallback ("default" routing).
+const FALLBACK_MODELS = new Set(['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5']);
 
 const modelOf = (env: Env) => env.AI_MODEL || DEFAULT_MODEL;
 
@@ -64,40 +66,33 @@ const stripTags = (s: string, tag: string) => s.replace(new RegExp(`<\\s*/?\\s*$
 
 // ---------------------------------------------------------------------------- provider
 
-interface AnthropicResponse {
-  content?: { type: string; text?: string }[];
-  stop_reason?: string | null;
-}
-
 async function complete(env: Env, system: string, content: string): Promise<string> {
-  let res: Response;
+  // Loaded lazily so the SDK stays out of bundles that never call the provider (e.g. the static preview).
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: TIMEOUT_MS, maxRetries: 1 });
+  const model = modelOf(env);
+  const fallback = FALLBACK_MODELS.has(model);
+  let text = '';
   try {
-    res = await fetch(ANTHROPIC_URL, {
-      method: 'POST',
-      headers: {
-        'x-api-key': env.ANTHROPIC_API_KEY!,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ model: modelOf(env), max_tokens: MAX_TOKENS, system, messages: [{ role: 'user', content }] }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+    const res = await client.beta.messages.create({
+      model,
+      max_tokens: MAX_TOKENS,
+      // Short, well-specified rewrites: low effort keeps latency and cost down.
+      output_config: { effort: 'low' },
+      system,
+      messages: [{ role: 'user', content }],
+      ...(fallback ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const } : {}),
     });
-  } catch {
+    if (res.stop_reason === 'refusal') {
+      throw new ApiError(422, 'ai_declined', 'The assistant declined to help with this text.');
+    }
+    for (const block of res.content) if (block.type === 'text') text += block.text;
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    // Never surface the provider's error body (or anything that might echo the key).
     throw aiFailed();
   }
-  if (!res.ok) throw aiFailed(); // never echo the provider's error body
-  let data: AnthropicResponse;
-  try {
-    data = (await res.json()) as AnthropicResponse;
-  } catch {
-    throw aiFailed();
-  }
-  if (data.stop_reason === 'refusal' || !Array.isArray(data.content)) throw aiFailed();
-  const text = data.content
-    .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
-    .map((b) => b.text)
-    .join('')
-    .trim();
+  text = text.trim();
   if (!text) throw aiFailed();
   return text;
 }
