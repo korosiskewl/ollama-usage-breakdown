@@ -1,5 +1,5 @@
 # Publishes the in-browser preview build to GitHub Pages.
-# One-time setup: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# If the first run fails at configure-pages: Settings → Pages → Build and deployment → Source: "GitHub Actions", then re-run.
 name: Deploy preview to GitHub Pages
 
 on:
@@ -29,6 +29,9 @@ jobs:
       - run: npm test
       - run: npm run build:pages
       - uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on (source: GitHub Actions) if it isn't already.
+          enablement: true
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
