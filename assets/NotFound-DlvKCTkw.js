@@ -1,0 +1,2 @@
+import{l as e}from"./router-C3INevYe.js";import{t}from"./NotFoundState-DloSWdP0.js";var n=e();function r(e){return(0,n.jsx)(t,{heading:`h1`})}export{r as default};
+//# sourceMappingURL=NotFound-DlvKCTkw.js.map

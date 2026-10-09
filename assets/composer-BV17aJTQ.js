@@ -1,0 +1,2 @@
+import{u as e}from"./router-C3INevYe.js";var t=e(),n=null,r=new Set,i=()=>r.forEach(e=>e());function a(e={}){n=e,i()}function o(){n=null,i()}function s(){return(0,t.useSyncExternalStore)(e=>(r.add(e),()=>r.delete(e)),()=>n)}var c=new Set;function l(e){c.forEach(t=>t(e))}function u(e){return c.add(e),()=>{c.delete(e)}}export{s as a,a as i,l as n,u as r,o as t};
+//# sourceMappingURL=composer-BV17aJTQ.js.map
