@@ -339,15 +339,16 @@ export function Shell({ children }: { children: ReactNode }) {
   const { path } = useLocation();
   const online = useOnline();
   const mainRef = useRef<HTMLElement>(null);
-  const firstPath = useRef(true);
+  const lastPath = useRef<string | null>(null);
   useHistoryDepth();
 
   // Move focus to the new page on navigation (unless the page already focused something itself).
   useEffect(() => {
-    if (firstPath.current) {
-      firstPath.current = false;
+    if (lastPath.current === null || lastPath.current === path) {
+      lastPath.current = path;
       return;
     }
+    lastPath.current = path;
     const main = mainRef.current;
     if (!main) return;
     const t = window.setTimeout(() => {
@@ -377,7 +378,7 @@ export function Shell({ children }: { children: ReactNode }) {
         { to: '/search', label: 'Search', icon: 'search' },
       ];
 
-  const layout = match('/post/:id/read', path) ? 'reader' : 'default';
+  const layout = match('/post/:id/read', path) ? 'reader' : path === '/messages' || path.startsWith('/messages/') ? 'wide' : 'default';
 
   return (
     <>

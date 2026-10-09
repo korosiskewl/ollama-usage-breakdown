@@ -16,7 +16,8 @@ export class ApiRequestError extends Error {
 }
 
 async function send(req: Request): Promise<Response> {
-  if (PREVIEW) {
+  // Compared against import.meta.env directly so production builds drop the preview runtime entirely.
+  if (import.meta.env.VITE_RELAY_MODE === 'preview') {
     const { previewFetch } = await import('../preview/runtime');
     return previewFetch(req);
   }
@@ -75,7 +76,7 @@ export const api = {
 /** Resolve an API media URL into something an <img> can load (object URL in preview mode). */
 const mediaCache = new Map<string, Promise<string>>();
 export function resolveMedia(src: string): Promise<string> {
-  if (!PREVIEW) return Promise.resolve(src);
+  if (import.meta.env.VITE_RELAY_MODE !== 'preview') return Promise.resolve(src);
   let p = mediaCache.get(src);
   if (!p) {
     p = (async () => {

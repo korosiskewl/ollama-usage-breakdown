@@ -77,7 +77,6 @@ interface Runtime {
 }
 
 let boot: Promise<Runtime> | null = null;
-let saveTimer: number | undefined;
 
 function getRuntime(): Promise<Runtime> {
   return (boot ??= (async () => {
@@ -99,24 +98,18 @@ function getRuntime(): Promise<Runtime> {
       await seed((req) => app.fetch(req, env), db);
       // Seeding signs demo users in; start the visitor signed out.
       localStorage.removeItem(SESSION_KEY);
-      persistNow(rt);
+      await persist(rt);
     }
-    window.addEventListener('pagehide', () => persistNow(rt));
     return rt;
   })());
 }
 
-function persistNow(rt: Runtime) {
-  window.clearTimeout(saveTimer);
+/** Write the database to IndexedDB. Awaited before a write request resolves, so success in the UI means it is stored. */
+async function persist(rt: Runtime) {
   const bytes = rt.db.raw.export();
   // export() re-opens the database and resets pragmas.
   rt.db.raw.run('PRAGMA foreign_keys = ON');
-  void idbPut(DB_KEY, bytes);
-}
-
-function schedulePersist(rt: Runtime) {
-  window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => persistNow(rt), 250);
+  await idbPut(DB_KEY, bytes);
 }
 
 // Serialise requests: sql.js is synchronous and the app expects D1's one-statement-at-a-time semantics.
@@ -144,7 +137,7 @@ export function previewFetch(req: Request): Promise<Response> {
         /* storage blocked */
       }
     }
-    if (req.method !== 'GET') schedulePersist(rt);
+    if (req.method !== 'GET') await persist(rt);
     return res;
   };
   const p = queue.then(run, run);

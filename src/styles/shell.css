@@ -35,9 +35,11 @@
   min-height: 100dvh;
 }
 .shell[data-layout='reader'] { grid-template-columns: var(--rail-left) minmax(0, 780px) minmax(0, var(--rail-left)); }
-.shell-center { min-width: 0; border-left: 1px solid var(--rule); border-right: 1px solid var(--rule); }
+/* Messages: two panes need the right rail's width. */
+.shell[data-layout='wide'] { grid-template-columns: var(--rail-left) minmax(0, calc(var(--col) + var(--rail-right) + var(--s-6))); }
+.shell-center { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--rule); border-right: 1px solid var(--rule); }
 .shell[data-layout='reader'] .shell-center { border-color: transparent; }
-.shell-main { min-height: 100%; outline: none; }
+.shell-main { flex: 1 0 auto; outline: none; }
 .shell-main:focus-visible { outline: none; }
 
 /* ---------- left rail ---------- */
@@ -158,6 +160,12 @@
 .page-head-row + .tabs { margin-top: calc(-1 * var(--s-2)); }
 
 /* ---------- toasts (additions) ---------- */
+/* Shown as a manual popover (top layer): undo the UA popover box. */
+.toasts[popover] {
+  top: auto; right: auto; margin: 0; padding: 0; border: 0; background: transparent; color: inherit;
+  overflow: visible; height: auto; pointer-events: none;
+}
+.toasts .toast { pointer-events: auto; }
 .toast-success { background: var(--ink); }
 .toast .toast-close { display: inline-grid; place-items: center; padding: 4px; opacity: 0.75; }
 .toast .toast-close:hover { opacity: 1; }
@@ -251,6 +259,7 @@
 @media (max-width: 1099px) and (min-width: 861px) {
   .shell, .shell[data-layout='reader'] { grid-template-columns: 84px minmax(0, var(--col)); column-gap: var(--s-4); }
   .shell[data-layout='reader'] { grid-template-columns: 84px minmax(0, 760px); }
+  .shell[data-layout='wide'] { grid-template-columns: 84px minmax(0, 900px); }
   .rail-right { display: none; }
   .rail-left-inner { align-items: center; padding-left: var(--s-2); padding-right: var(--s-2); }
   .rail-brand { align-self: center; padding: var(--s-1) var(--s-2) var(--s-5); }

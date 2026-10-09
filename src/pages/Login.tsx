@@ -63,8 +63,8 @@ export default function Login(_props: { params: Record<string, string> }) {
 
         {PREVIEW && (
           <p className="notice notice-signal auth-notice">
-            <strong>Preview build:</strong> sample accounts all use the password <code>relay-preview-demo</code>. Or{' '}
-            <Link to="/signup">create your own</Link> — it stays in this browser.
+            <strong>Preview build:</strong> every demo account (it says so in the bio) uses the password <code>relay-preview-demo</code>.
+            Or <Link to="/signup">create your own</Link> — it stays in this browser.
           </p>
         )}
 

@@ -5,27 +5,34 @@ import { Icon } from './Icon';
 // Rough count of in-app history entries, so "Back" never leaves Relay for whatever page came before it.
 let depth = 0;
 let popped = false;
+let replaced = false;
 if (typeof window !== 'undefined') window.addEventListener('popstate', () => (popped = true));
 
 /** Called once by the shell: keeps the in-app history depth up to date. */
 export function useHistoryDepth() {
   const { path } = useLocation();
-  const first = useRef(true);
+  const last = useRef<string | null>(null);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
+    // Idempotent: StrictMode re-runs effects, and only real path changes count.
+    if (last.current === null || last.current === path) {
+      last.current = path;
       return;
     }
+    last.current = path;
     if (popped) depth = Math.max(0, depth - 1);
-    else depth++;
+    else if (!replaced) depth++;
     popped = false;
+    replaced = false;
   }, [path]);
 }
 
 /** Go back within the app when there is in-app history, otherwise to a sensible parent. */
 export function goBack(fallback = '/') {
   if (depth > 0) history.back();
-  else navigate(fallback, { replace: true });
+  else {
+    replaced = true;
+    navigate(fallback, { replace: true });
+  }
 }
 
 /**

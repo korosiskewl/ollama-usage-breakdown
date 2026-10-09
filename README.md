@@ -11,7 +11,7 @@ the back, and the same server code compiled into a fully working in-browser prev
 
 ## Try it
 
-- **Preview (GitHub Pages):** `https://korosiskewl.github.io/<repo-name>/`. Runs entirely in your browser
+- **Preview (GitHub Pages):** `https://korosiskewl.github.io/relay/` (once the repo is renamed to `relay` and Pages is enabled). Runs entirely in your browser
   (WebAssembly SQLite + IndexedDB). Your data never leaves your device. Demo accounts are sample content; their
   password is `relay-preview-demo`. The first account you create becomes an admin so you can try moderation.
 - **Real multi-user deployment:** a Cloudflare Worker + D1. See [docs/DEPLOY.md](docs/DEPLOY.md).

@@ -75,10 +75,10 @@ export default function Profile({ params }: { params: Record<string, string> }) 
       <>
         <PageHead title={`@${handle}`} back="/" />
         {status === 404 ? (
-          <NotFoundState title="This account doesn’t exist.">
+          <NotFoundState title="This account isn’t available.">
             <p>
-              There’s no one on Relay called <strong>@{handle}</strong> — or they’ve deleted their account. Check the spelling, or look
-              for them in Search.
+              There’s no account called <strong>@{handle}</strong> that you can see. The handle may be misspelled, or the account may
+              have been deleted. Try <Link to={`/search?q=${encodeURIComponent(handle)}`}>searching for it</Link>.
             </p>
           </NotFoundState>
         ) : (

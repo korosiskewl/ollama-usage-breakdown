@@ -33,6 +33,8 @@ export async function seed(fetchApp: (req: Request) => Response | Promise<Respon
   const raw = db.raw;
   // Demo accounts are ordinary users; the visitor's first own account becomes admin.
   raw.run("UPDATE users SET role = 'user'");
+  // Demo accounts accept DMs from anyone so visitors can try messaging straight away.
+  raw.run("UPDATE user_settings SET dm_policy = 'everyone'");
   for (const u of USERS) raw.run('UPDATE users SET bio = ? WHERE id = ?', [u.bio, ids[u.handle]]);
   raw.run('DELETE FROM sessions');
 

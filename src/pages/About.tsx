@@ -41,6 +41,7 @@ export default function About(_props: { params: Record<string, string> }) {
   async function reset() {
     setBusy(true);
     try {
+      if (import.meta.env.VITE_RELAY_MODE !== 'preview') return;
       const { resetPreview } = await import('../preview/runtime');
       await resetPreview();
     } catch (e) {
@@ -89,8 +90,9 @@ export default function About(_props: { params: Record<string, string> }) {
                 they aren’t real users.
               </li>
               <li>
-                <strong>Try both sides.</strong> Every <code>@demo</code> account uses the password <code>relay-preview-demo</code>, so you
-                can sign in as someone else to test direct messages, follow requests and notifications from the other end.
+                <strong>Try both sides.</strong> Sample accounts say “Demo account” in their bio, and every one of them uses the password{' '}
+                <code>relay-preview-demo</code>. Sign in as one in another browser profile (or sign out and back in) to test direct messages,
+                follow requests and notifications from the other end.
               </li>
               <li>
                 <strong>You can moderate.</strong> The first account you create becomes an admin, so the moderation queue and tools are
