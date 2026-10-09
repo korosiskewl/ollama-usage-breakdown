@@ -19,10 +19,12 @@ npm run dev:worker       # http://localhost:8787
 
 ## GitHub Pages preview
 
-1. Settings → Pages → Build and deployment → **Source: GitHub Actions**.
-2. If this repository is a fork, open the **Actions** tab once and enable workflows.
-3. Push to `main` (or run "Deploy preview to GitHub Pages" manually). The site appears at
-   `https://<user>.github.io/<repo>/`.
+Live at **https://korosiskewl.github.io/ollama-usage-breakdown/** (or `…/relay/` after a rename — the build uses
+relative paths and hash routing, so any repo name works).
+
+Every push to `main` runs "Deploy preview to GitHub Pages", which tests, builds and force-pushes the output to the
+`gh-pages` branch; GitHub Pages serves that branch (Settings → Pages → Source: "Deploy from a branch", `gh-pages`, `/`).
+Never commit source to `gh-pages` — it is replaced on every publish.
 
 ## Cloudflare (the real, multi-user Relay)
 

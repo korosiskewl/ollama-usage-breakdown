@@ -1,5 +1,5 @@
-# Publishes the in-browser preview build to GitHub Pages.
-# If the first run fails at configure-pages: Settings → Pages → Build and deployment → Source: "GitHub Actions", then re-run.
+# Builds the in-browser preview and publishes it to the gh-pages branch, which GitHub Pages serves.
+# Site: https://<owner>.github.io/<repo>/  (the build uses relative paths, so any repo name works)
 name: Deploy preview to GitHub Pages
 
 on:
@@ -8,16 +8,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -28,20 +26,17 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build:pages
-      - uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on (source: GitHub Actions) if it isn't already.
-          enablement: true
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages
+        working-directory: dist
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          find . -name '*.map' -delete
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Publish preview from ${GITHUB_SHA}"
+          # gh-pages holds build output only, so it is replaced wholesale on each publish.
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
