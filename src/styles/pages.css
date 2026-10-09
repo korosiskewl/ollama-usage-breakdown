@@ -115,9 +115,7 @@
 .reader-gone { font-style: italic; color: var(--ink-3); }
 .reader-foot { margin-top: var(--s-10); text-align: center; }
 .reader-end { display: inline-grid; place-items: center; }
-.reader-end-mark { width: 18px; height: 18px; fill: var(--signal); stroke: var(--signal); stroke-width: 1.8; stroke-linecap: round; }
-.reader-end-mark circle { stroke: none; }
-.reader-end-mark path { fill: none; }
+.reader-end-mark { width: 9px; height: 9px; fill: var(--signal); }
 .reader-colophon { margin-top: var(--s-3); }
 .reader-conversation { margin-top: var(--s-6); padding-top: var(--s-5); border-top: 1px solid var(--rule); font-family: var(--font-ui); font-size: 15px; color: var(--ink-2); }
 .reader-conversation a { color: var(--signal-ink); font-weight: 600; }
@@ -255,7 +253,7 @@
 
 @media (max-width: 560px) {
   .welcome-principles { grid-template-columns: 1fr; }
-  .welcome-principles li, .welcome-principles li:nth-child(even) { padding: var(--s-4) 0; border-right: 0; }
+  .welcome-principles li, .welcome-principles li:nth-child(odd), .welcome-principles li:nth-child(even) { padding: var(--s-4) 0; border-right: 0; }
   .prose-dl { grid-template-columns: 1fr; gap: 2px; }
   .prose-dl dd { margin-bottom: var(--s-3); }
   .profile-name { font-size: 1.5rem; }
